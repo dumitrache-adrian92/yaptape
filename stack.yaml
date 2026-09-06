@@ -1,0 +1,10 @@
+snapshot:
+  url: https://raw.githubusercontent.com/commercialhaskell/stackage-snapshots/master/lts/24/50.yaml
+
+packages:
+- .
+
+docker:
+  enable: false
+  image: "fpco/stack-build:lts-24.50"
+  run-args: ["--init"]

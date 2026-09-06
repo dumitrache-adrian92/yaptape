@@ -1,0 +1,43 @@
+cabal-version: 2.2
+
+-- This file has been generated from package.yaml by hpack version 0.39.6.
+--
+-- see: https://github.com/sol/hpack
+
+name:           yaptape
+version:        0.1.0.0
+author:         Adrian-George Dumitrache
+maintainer:     Adrian-George Dumitrache
+copyright:      2026 Adrian-George Dumitrache
+license:        BSD-3-Clause
+license-file:   LICENSE
+build-type:     Simple
+extra-source-files:
+    README.md
+
+executable yaptape-exe
+  main-is: Main.hs
+  other-modules:
+      Paths_yaptape
+  autogen-modules:
+      Paths_yaptape
+  hs-source-dirs:
+      app
+  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010
+
+test-suite yaptape-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Paths_yaptape
+  autogen-modules:
+      Paths_yaptape
+  hs-source-dirs:
+      test
+  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+  default-language: Haskell2010

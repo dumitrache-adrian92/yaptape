@@ -15,6 +15,28 @@ build-type:     Simple
 extra-source-files:
     README.md
 
+library
+  exposed-modules:
+      Yaptape
+      Yaptape.Api
+      Yaptape.Server
+  other-modules:
+      Paths_yaptape
+  autogen-modules:
+      Paths_yaptape
+  hs-source-dirs:
+      src
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
+  build-depends:
+      aeson
+    , base
+    , servant
+    , servant-server
+    , transformers
+    , wai
+    , warp
+  default-language: Haskell2010
+
 executable yaptape-exe
   main-is: Main.hs
   other-modules:
@@ -23,21 +45,41 @@ executable yaptape-exe
       Paths_yaptape
   hs-source-dirs:
       app
-  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base
+    , servant
+    , servant-server
+    , transformers
+    , wai
+    , warp
+    , yaptape
   default-language: Haskell2010
 
 test-suite yaptape-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Integration.HealthSpec
+      Unit.HealthSpec
       Paths_yaptape
   autogen-modules:
       Paths_yaptape
   hs-source-dirs:
       test
-  ghc-options: -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
+  ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      base >=4.7 && <5
+      aeson
+    , base
+    , hspec
+    , http-client
+    , http-types
+    , servant
+    , servant-client
+    , servant-server
+    , transformers
+    , wai
+    , warp >=3.2.4
+    , yaptape
   default-language: Haskell2010

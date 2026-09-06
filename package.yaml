@@ -7,10 +7,9 @@ copyright:           "2026 Adrian-George Dumitrache"
 extra-source-files:
 - README.md
 
-dependencies:
-- base >= 4.7 && < 5
-
 ghc-options:
+- -Wall
+# - -Werror
 - -Wcompat
 - -Widentities
 - -Wincomplete-record-updates
@@ -28,6 +27,13 @@ executables:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    dependencies:
+      yaptape
+
+library:
+  source-dirs:
+    - src
+
 
 tests:
   yaptape-test:
@@ -37,3 +43,19 @@ tests:
     - -threaded
     - -rtsopts
     - -with-rtsopts=-N
+    dependencies:
+      - hspec
+      - yaptape
+      - servant-client
+      - warp >= 3.2.4
+      - http-client
+      - http-types
+
+dependencies:
+- base
+- servant
+- servant-server
+- transformers
+- aeson
+- wai
+- warp

@@ -1,5 +1,6 @@
 module Main (main) where
 
+import Yaptape (run)
+
 main :: IO ()
-main = do
-  print "hello world"
+main = run

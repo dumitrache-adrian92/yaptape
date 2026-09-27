@@ -3,8 +3,8 @@
 }
 body {
   margin:0;
-  background:#f4efe5;
-  color:#222019;
+  background:#eef4fa;
+  color:#1c2b3a;
   font-family:'DM Sans',sans-serif
 }
 .page-shell,.landing {
@@ -25,7 +25,7 @@ body {
 .wordmark {
   display:inline-block;
   margin-bottom:48px;
-  color:#30271f;
+  color:#20364a;
   text-decoration:none;
   font-weight:700;
   letter-spacing:.08em;
@@ -35,7 +35,7 @@ body {
   font-size:.72rem;
   font-weight:700;
   letter-spacing:.17em;
-  color:#a14f38
+  color:#356f9f
 }
 h1 {
   font:600 clamp(2.5rem,7vw,4.7rem)/1.04 'Playfair Display',serif;
@@ -51,19 +51,19 @@ h2 {
   font-size:1.15rem;
   line-height:1.7;
   max-width:540px;
-  color:#625c51;
+  color:#53697c;
   margin:0 0 30px
 }
 .muted {
-  color:#716b61;
+  color:#667b8e;
   line-height:1.65
 }
 .create-card {
-  background:#fffdf8;
-  border:1px solid #e5ddcf;
+  background:#fbfdff;
+  border:1px solid #d4e1ed;
   border-radius:22px;
   padding:clamp(24px,5vw,48px);
-  box-shadow:0 18px 50px #3127190d
+  box-shadow:0 18px 50px #172f4a0d
 }
 .field-label {
   display:block;
@@ -89,16 +89,16 @@ h2 {
   align-items:stretch
 }
 .player-column,.note-panel {
-  background:#fffdf8;
-  border:1px solid #e5ddcf;
+  background:#fbfdff;
+  border:1px solid #d4e1ed;
   border-radius:20px;
   padding:24px;
-  box-shadow:0 18px 50px #3127190d
+  box-shadow:0 18px 50px #172f4a0d
 }
 .player-deck {
   height:155px;
-  background:#342e27;
-  border:8px solid #24211d;
+  background:#273b50;
+  border:8px solid #172a3b;
   border-radius:14px;
   position:relative;
   display:flex;
@@ -113,9 +113,9 @@ h2 {
   left:10%;
   right:10%;
   height:9px;
-  background:#171512;
+  background:#101d2a;
   border-radius:99px;
-  box-shadow:0 3px 0 #594f42
+  box-shadow:0 3px 0 #405b74
 }
 .cassette {
   position:absolute;
@@ -123,19 +123,19 @@ h2 {
   top:28px;
   width:min(76%,360px);
   height:120px;
-  background:#cb6548;
-  border:5px solid #211e1a;
+  background:#5b9aca;
+  border:5px solid #192b3c;
   border-radius:9px;
   display:grid;
   grid-template-columns:1fr 52px 52px;
   align-items:center;
   gap:12px;
   padding:12px 16px;
-  box-shadow:0 6px 0 #863f2d;
+  box-shadow:0 6px 0 #35668e;
   animation:tape-in .9s cubic-bezier(.2,.8,.2,1) both
 }
 .cassette-label {
-  background:#f1dfbd;
+  background:#deedf8;
   border-radius:4px;
   padding:8px 12px;
   min-width:0
@@ -154,17 +154,17 @@ h2 {
 .cassette-reel {
   width:44px;
   height:44px;
-  border:6px solid #27231e;
+  border:6px solid #1d3448;
   border-radius:50%;
-  background:repeating-conic-gradient(#27231e 0 13deg,#e5d2af 13deg 27deg);
+  background:repeating-conic-gradient(#1d3448 0 13deg,#c3ddf0 13deg 27deg);
   display:grid;
   place-items:center
 }
 .reel-hub {
   width:12px;
   height:12px;
-  background:#cb6548;
-  border:3px solid #27231e;
+  background:#5b9aca;
+  border:3px solid #1d3448;
   border-radius:50%
 }
 .cassette-window {
@@ -174,14 +174,14 @@ h2 {
   width:14%;
   height:8px;
   border-radius:4px;
-  background:#4a332b
+  background:#2c4b64
 }
 .player-deck[data-playing=true] .cassette-reel {
   animation:reel-spin 2s linear infinite
 }
 .video-frame {
   aspect-ratio:16/9;
-  background:#171512;
+  background:#101d2a;
   border-radius:12px;
   overflow:hidden
 }
@@ -200,7 +200,7 @@ h2 {
 .transport-button {
   background:transparent;
   border:0;
-  color:#61584e;
+  color:#536b80;
   font:600 .9rem 'DM Sans',sans-serif;
   padding:12px;
   cursor:pointer
@@ -221,7 +221,7 @@ h2 {
 .playback-status {
   text-align:center;
   min-height:1.5em;
-  color:#716b61;
+  color:#667b8e;
   font-size:.85rem
 }
 .note-panel {
@@ -238,7 +238,7 @@ h2 {
   margin:8px 0
 }
 .current-track-artist {
-  color:#716b61;
+  color:#667b8e;
   margin:0
 }
 .current-track-note {
@@ -248,7 +248,7 @@ h2 {
 }
 .track-count {
   font-size:.8rem;
-  color:#827a6e
+  color:#72879a
 }
 .queue-section {
   margin-top:34px
@@ -262,7 +262,7 @@ h2 {
   list-style:none;
   padding:0;
   margin:10px 0;
-  border-top:1px solid #e5ddcf
+  border-top:1px solid #d4e1ed
 }
 .queue-track {
   display:grid;
@@ -272,17 +272,17 @@ h2 {
   width:100%;
   padding:16px 12px;
   border:0;
-  border-bottom:1px solid #e5ddcf;
+  border-bottom:1px solid #d4e1ed;
   background:transparent;
-  color:#30271f;
+  color:#20364a;
   text-align:left;
   cursor:pointer
 }
 .queue-track:hover,.queue-track[aria-current=true] {
-  background:#fffdf8
+  background:#fbfdff
 }
 .queue-number {
-  color:#a14f38;
+  color:#356f9f;
   font-variant-numeric:tabular-nums
 }
 .queue-track-title,.queue-track-artist {
@@ -293,10 +293,10 @@ h2 {
 }
 .queue-track-artist {
   font-size:.82rem;
-  color:#827a6e
+  color:#72879a
 }
 .queue-indicator {
-  color:#a14f38;
+  color:#356f9f;
   font-size:.82rem
 }
 .queue-track[aria-current=true] .queue-indicator:after {
@@ -352,16 +352,16 @@ h2 {
 input,textarea {
   width:100%;
   font:inherit;
-  color:#222019;
+  color:#1c2b3a;
   background:#fff;
-  border:1px solid #dcd4c6;
+  border:1px solid #c7d6e4;
   border-radius:10px;
   padding:13px 14px;
   outline:none
 }
 input:focus,textarea:focus {
-  border-color:#a14f38;
-  box-shadow:0 0 0 3px #a14f381c
+  border-color:#356f9f;
+  box-shadow:0 0 0 3px #356f9f1c
 }
 textarea {
   resize:vertical
@@ -373,7 +373,7 @@ textarea {
   display:inline-flex;
   align-items:center;
   justify-content:center;
-  background:#a14f38;
+  background:#356f9f;
   border:0;
   border-radius:999px;
   color:white;
@@ -383,7 +383,7 @@ textarea {
   cursor:pointer
 }
 .button:hover {
-  background:#843d2b
+  background:#285a84
 }
 .tracks-heading {
   display:flex;
@@ -394,7 +394,7 @@ textarea {
 .quiet-button,.icon-button {
   border:0;
   background:transparent;
-  color:#a14f38;
+  color:#356f9f;
   font:600 .9rem 'DM Sans',sans-serif;
   cursor:pointer
 }
@@ -403,10 +403,10 @@ textarea {
   grid-template-columns:34px 1fr auto;
   gap:12px;
   padding:16px 0;
-  border-top:1px solid #eee7db
+  border-top:1px solid #e1eaf2
 }
 .track-number {
-  color:#a14f38;
+  color:#356f9f;
   padding-top:12px
 }
 .track-fields {
@@ -414,14 +414,14 @@ textarea {
 }
 .url-hint,.fine-print {
   font-size:.78rem;
-  color:#827a6e;
+  color:#72879a;
   margin:7px 0
 }
 .url-valid {
   color:#47734d
 }
 .url-invalid {
-  color:#a14f38
+  color:#356f9f
 }
 .row-actions {
   display:flex;
@@ -430,11 +430,11 @@ textarea {
 }
 .icon-button {
   font-size:1.1rem;
-  color:#766c5d;
+  color:#63798d;
   padding:6px
 }
 .remove-button {
-  color:#a14f38
+  color:#356f9f
 }
 .submit-button {
   margin-top:18px
@@ -442,8 +442,8 @@ textarea {
 .error {
   padding:12px 14px;
   border-radius:9px;
-  background:#fbebe6;
-  color:#923c2b
+  background:#f9e8ec;
+  color:#9a4254
 }
 .share-box {
   display:flex;
@@ -455,13 +455,13 @@ textarea {
 }
 .text-link {
   display:inline-block;
-  color:#a14f38;
+  color:#356f9f;
   font-weight:600;
   text-decoration:none;
   margin:14px 18px 0 0
 }
 .secondary-link {
-  color:#716b61
+  color:#667b8e
 }
 .success-card h1 {
   font-size:clamp(2.5rem,6vw,3.8rem)
@@ -472,20 +472,20 @@ textarea {
   bottom:9%;
   width:210px;
   height:132px;
-  background:#cb6548;
-  border:7px solid #24211d;
+  background:#5b9aca;
+  border:7px solid #172a3b;
   border-radius:12px;
   transform:rotate(-8deg);
-  box-shadow:14px 18px 0 #dbd0be
+  box-shadow:14px 18px 0 #c9dbea
 }
 .reel {
   position:absolute;
   top:27px;
   width:56px;
   height:56px;
-  border:8px solid #29251f;
+  border:8px solid #20384d;
   border-radius:50%;
-  background:repeating-conic-gradient(#29251f 0 12deg,#f0d6ad 12deg 25deg)
+  background:repeating-conic-gradient(#20384d 0 12deg,#c9e2f3 12deg 25deg)
 }
 .reel-one {
   left:27px
@@ -498,10 +498,10 @@ textarea {
 }
 .shared-track {
   padding:16px 10px;
-  border-top:1px solid #eee7db
+  border-top:1px solid #e1eaf2
 }
 .track-note-display {
-  background:#f7f1e7;
+  background:#e6f0f8;
   border-radius:10px;
   padding:14px;
   line-height:1.6

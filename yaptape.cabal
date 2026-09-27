@@ -18,6 +18,7 @@ extra-source-files:
     db/migrations/001_create_mixtapes.sql
     db/migrations/002_add_field_limits.sql
     static/css/app.css
+    static/favicon.svg
     static/js/copy-link.js
     static/js/create.js
     static/js/htmx.min.js
@@ -25,6 +26,7 @@ extra-source-files:
     static/js/playback.js
 data-files:
     static/css/app.css
+    static/favicon.svg
     static/js/copy-link.js
     static/js/create.js
     static/js/htmx.min.js

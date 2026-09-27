@@ -119,6 +119,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       landingResponse <- httpLbs landingRequest manager
       statusCode (responseStatus landingResponse) `shouldBe` 200
       BL8.unpack (responseBody landingResponse) `shouldContain` "Make a mixtape that says a little more"
+      BL8.unpack (responseBody landingResponse) `shouldContain` "/assets/favicon.svg"
       oversizedRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")
       let oversizedRequest = oversizedRequestBase
             { method = "POST"
@@ -146,6 +147,10 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       stylesheetResponse <- httpLbs stylesheetRequest manager
       statusCode (responseStatus stylesheetResponse) `shouldBe` 200
       BL8.unpack (responseBody stylesheetResponse) `shouldContain` ".listening-layout"
+      faviconRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/favicon.svg")
+      faviconResponse <- httpLbs faviconRequest manager
+      statusCode (responseStatus faviconResponse) `shouldBe` 200
+      BL8.unpack (responseBody faviconResponse) `shouldContain` "<svg"
       formRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")
       let formRequest = formRequestBase
             { method = "POST"

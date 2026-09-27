@@ -130,6 +130,7 @@ layout pageTitle content = doctypehtml_ $ html_ [lang_ "en"] $ do
     meta_ [charset_ "utf-8"]
     meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1"]
     title_ (toHtml pageTitle)
+    link_ [rel_ "icon", type_ "image/svg+xml", href_ "/assets/favicon.svg"]
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_ [rel_ "preconnect", href_ "https://fonts.gstatic.com", crossorigin_ "anonymous"]
     link_ [rel_ "stylesheet", href_ "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap"]

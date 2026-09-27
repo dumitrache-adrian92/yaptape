@@ -14,12 +14,15 @@ license-file:   LICENSE
 build-type:     Simple
 extra-source-files:
     README.md
+    compose.yaml
+    db/migrations/001_create_mixtapes.sql
 
 library
   exposed-modules:
       Yaptape
       Yaptape.Api
       Yaptape.Db
+      Yaptape.Db.Postgres
       Yaptape.Db.Schema
       Yaptape.Domain
       Yaptape.Server
@@ -32,7 +35,11 @@ library
   build-depends:
       aeson
     , base
+    , base64-bytestring
     , bytestring
+    , hasql
+    , hasql-pool
+    , hasql-transaction
     , http-types
     , lucid
     , network-uri
@@ -42,6 +49,7 @@ library
     , text
     , time
     , transformers
+    , uuid
     , wai
     , warp
   default-language: Haskell2010
@@ -58,7 +66,11 @@ executable yaptape-exe
   build-depends:
       aeson
     , base
+    , base64-bytestring
     , bytestring
+    , hasql
+    , hasql-pool
+    , hasql-transaction
     , http-types
     , lucid
     , network-uri
@@ -68,6 +80,7 @@ executable yaptape-exe
     , text
     , time
     , transformers
+    , uuid
     , wai
     , warp
     , yaptape
@@ -78,6 +91,8 @@ test-suite yaptape-test
   main-is: Spec.hs
   other-modules:
       Integration.HealthSpec
+      Integration.MixtapeSpec
+      Unit.ApiSpec
       Unit.DbSpec
       Unit.HealthSpec
       Unit.YouTubeSpec
@@ -90,7 +105,11 @@ test-suite yaptape-test
   build-depends:
       aeson
     , base
+    , base64-bytestring
     , bytestring
+    , hasql
+    , hasql-pool
+    , hasql-transaction
     , hspec
     , http-client
     , http-types
@@ -103,6 +122,7 @@ test-suite yaptape-test
     , text
     , time
     , transformers
+    , uuid
     , wai
     , warp >=3.2.4
     , yaptape

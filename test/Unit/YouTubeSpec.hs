@@ -23,44 +23,17 @@ spec = describe "Yaptape.YouTube" $ do
       let res = mkYouTubeVideoId "_rVvjslF-M8"
       fmap unYouTubeVideoId res `shouldBe` Right "_rVvjslF-M8"
 
-    it "extracts ID from standard watch URL" $ do
-      let res = mkYouTubeVideoId "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
-      fmap unYouTubeVideoId res `shouldBe` Right "dQw4w9WgXcQ"
-
-    it "extracts ID from watch URL with extra query parameters" $ do
-      let res = mkYouTubeVideoId "https://www.youtube.com/watch?feature=share&v=dQw4w9WgXcQ&t=42s"
-      fmap unYouTubeVideoId res `shouldBe` Right "dQw4w9WgXcQ"
-
-    it "extracts ID from watch URL with subsequent parameters containing 'v='" $ do
-      let res1 = mkYouTubeVideoId "https://www.youtube.com/watch?v=dQw4w9WgXcQ&prev=true"
-      fmap unYouTubeVideoId res1 `shouldBe` Right "dQw4w9WgXcQ"
-
-      let res2 = mkYouTubeVideoId "https://www.youtube.com/watch?v=dQw4w9WgXcQ&nav=home"
-      fmap unYouTubeVideoId res2 `shouldBe` Right "dQw4w9WgXcQ"
-
-    it "extracts ID from youtu.be short URL" $ do
-      let res = mkYouTubeVideoId "https://youtu.be/dQw4w9WgXcQ?si=abc"
-      fmap unYouTubeVideoId res `shouldBe` Right "dQw4w9WgXcQ"
-
-    it "extracts ID from youtu.be URL without scheme" $ do
-      let res = mkYouTubeVideoId "youtu.be/dQw4w9WgXcQ"
-      fmap unYouTubeVideoId res `shouldBe` Right "dQw4w9WgXcQ"
-
-    it "extracts ID from shorts URL" $ do
-      let res = mkYouTubeVideoId "https://www.youtube.com/shorts/dQw4w9WgXcQ"
-      fmap unYouTubeVideoId res `shouldBe` Right "dQw4w9WgXcQ"
-
-    it "extracts ID from embed URL" $ do
-      let res = mkYouTubeVideoId "https://www.youtube.com/embed/dQw4w9WgXcQ"
-      fmap unYouTubeVideoId res `shouldBe` Right "dQw4w9WgXcQ"
+    it "rejects URLs; callers provide the video ID explicitly" $ do
+      mkYouTubeVideoId "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+        `shouldSatisfy` either (const True) (const False)
 
     it "rejects a video-like URL on an unrelated host" $ do
       mkYouTubeVideoId "https://example.com/watch?v=dQw4w9WgXcQ"
         `shouldSatisfy` either (const True) (const False)
 
-    it "rejects malformed UTF-8 in a URL query" $ do
+    it "rejects URL input instead of decoding its query string" $ do
       mkYouTubeVideoId "https://www.youtube.com/watch?v=%FF1234567890"
-        `shouldBe` Left (InvalidCharacters "\xfffd")
+        `shouldSatisfy` either (const True) (const False)
 
     it "fails on empty string" $ do
       mkYouTubeVideoId "" `shouldBe` Left EmptyInput
@@ -81,9 +54,9 @@ spec = describe "Yaptape.YouTube" $ do
       let res = decode "\"dQw4w9WgXcQ\""
       fmap unYouTubeVideoId res `shouldBe` Just "dQw4w9WgXcQ"
 
-    it "decodes URL to normalized ID" $ do
+    it "rejects URL input during JSON decoding" $ do
       let res = decode "\"https://youtu.be/dQw4w9WgXcQ\""
-      fmap unYouTubeVideoId res `shouldBe` Just "dQw4w9WgXcQ"
+      (res :: Maybe YouTubeVideoId) `shouldBe` Nothing
 
     it "fails decoding invalid JSON string for YouTubeVideoId" $ do
       let res = decode "\"not-valid\"" :: Maybe YouTubeVideoId

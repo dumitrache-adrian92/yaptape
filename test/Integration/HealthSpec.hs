@@ -11,7 +11,7 @@ import Servant.Client
   , runClientM
   )
 import Test.Hspec
-import Yaptape (mkApp)
+import Yaptape (withApp)
 import Yaptape.Api (healthApi)
 
 getHealth :: ClientM String
@@ -20,7 +20,7 @@ getHealth = client healthApi
 spec :: Spec
 spec = describe "GET /health (Integration)" $ do
   it "returns 200 OK with health message via HTTP client" $ do
-    testWithApplication mkApp $ \port -> do
+    withApp $ \app -> testWithApplication (pure app) $ \port -> do
       manager <- newManager defaultManagerSettings
       let env = mkClientEnv manager (BaseUrl Http "localhost" port "")
       res <- runClientM getHealth env

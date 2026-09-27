@@ -6,6 +6,8 @@ copyright:           "2026 Adrian-George Dumitrache"
 
 extra-source-files:
 - README.md
+- compose.yaml
+- db/migrations/001_create_mixtapes.sql
 
 ghc-options:
 - -Wall
@@ -51,6 +53,8 @@ tests:
       - warp >= 3.2.4
       - http-client
       - http-types
+      - text
+      - time
 
 dependencies:
 - base
@@ -67,3 +71,8 @@ dependencies:
 - http-types
 - lucid
 - servant-lucid
+- hasql
+- hasql-pool
+- hasql-transaction
+- uuid
+- base64-bytestring

@@ -1,4 +1,4 @@
-module Yaptape (run, mkApp) where
+module Yaptape (run, withApp) where
 
 import Network.Wai (Application)
 import Network.Wai.Handler.Warp
@@ -7,11 +7,12 @@ import Network.Wai.Handler.Warp
   , setBeforeMainLoop
   , setPort
   )
-import Servant (serve)
+import Control.Exception (bracket)
 import System.IO (hPutStrLn, stderr)
 
-import Yaptape.Api (appApi)
-import Yaptape.Server (server)
+import Yaptape.Db.Postgres (createPool)
+import Yaptape.Server (appForStore, postgresMixtapeStore)
+import qualified Hasql.Pool as Pool
 
 run :: IO ()
 run = do
@@ -20,7 +21,9 @@ run = do
         setPort port $
         setBeforeMainLoop (hPutStrLn stderr ("listening on port " ++ show port))
         defaultSettings
-  runSettings settings =<< mkApp
+  bracket createPool Pool.release $ \pool ->
+    runSettings settings (appForStore (postgresMixtapeStore pool))
 
-mkApp :: IO Application
-mkApp = return $ serve appApi server
+withApp :: (Application -> IO a) -> IO a
+withApp action = bracket createPool Pool.release $ \pool ->
+  action (appForStore (postgresMixtapeStore pool))

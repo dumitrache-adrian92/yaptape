@@ -31,6 +31,7 @@ import Servant
   , err500
   , err503
   , throwError
+  , serveDirectoryWebApp
   )
 import Servant (serve)
 import Servant.API (ToHttpApiData (toUrlPiece))
@@ -76,7 +77,8 @@ appForStore = serve appApi . server
 
 server :: MixtapeStore -> Server AppApi
 server store = healthHandler :<|> (createMixtapeHandler store :<|> getMixtapeHandler store) :<|>
-  (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler store) :<|> getSharedMixtapeHandler store))
+  (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler store) :<|> getSharedMixtapeHandler store)) :<|>
+  serveDirectoryWebApp "static"
 
 healthHandler :: Handler String
 healthHandler = return "https://www.youtube.com/watch?v=_rVvjslF6M8"

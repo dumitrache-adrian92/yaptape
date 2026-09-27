@@ -122,8 +122,16 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       createResponse <- httpLbs createRequest manager
       statusCode (responseStatus createResponse) `shouldBe` 200
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
-      BL8.unpack (responseBody createResponse) `shouldContain` "youtube.com/oembed"
+      BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js"
       BL8.unpack (responseBody createResponse) `shouldContain` "Track title (filled from YouTube)"
+      createScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/create.js")
+      createScriptResponse <- httpLbs createScriptRequest manager
+      statusCode (responseStatus createScriptResponse) `shouldBe` 200
+      BL8.unpack (responseBody createScriptResponse) `shouldContain` "youtube.com/oembed"
+      stylesheetRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/css/app.css")
+      stylesheetResponse <- httpLbs stylesheetRequest manager
+      statusCode (responseStatus stylesheetResponse) `shouldBe` 200
+      BL8.unpack (responseBody stylesheetResponse) `shouldContain` ".listening-layout"
       formRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")
       let formRequest = formRequestBase
             { method = "POST"
@@ -160,10 +168,14 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       pageResponse <- httpLbs pageRequest manager
       statusCode (responseStatus pageResponse) `shouldBe` 200
       BL8.unpack (responseBody pageResponse) `shouldContain` "A note"
-      BL8.unpack (responseBody pageResponse) `shouldContain` "youtube.com/iframe_api"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "/assets/js/playback.js"
       BL8.unpack (responseBody pageResponse) `shouldContain` "Start listening"
       BL8.unpack (responseBody pageResponse) `shouldContain` "data-video-id=\"dQw4w9WgXcQ\""
       BL8.unpack (responseBody pageResponse) `shouldContain` "listening-shell"
+      playbackScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/playback.js")
+      playbackScriptResponse <- httpLbs playbackScriptRequest manager
+      statusCode (responseStatus playbackScriptResponse) `shouldBe` 200
+      BL8.unpack (responseBody playbackScriptResponse) `shouldContain` "youtube.com/iframe_api"
 
 requiredMaybe :: Maybe a -> a
 requiredMaybe = maybe (error "invalid UUID fixture") id

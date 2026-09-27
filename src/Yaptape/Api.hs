@@ -18,7 +18,7 @@ module Yaptape.Api
 import Data.Proxy (Proxy (..))
 import Lucid (Html)
 import Data.Text (Text)
-import Servant.API ((:<|>) (..), (:>), Capture, FormUrlEncoded, Get, Header, Headers, JSON, PlainText, Post, PostCreated, ReqBody)
+import Servant.API ((:<|>) (..), (:>), Capture, FormUrlEncoded, Get, Header, Headers, JSON, PlainText, Post, PostCreated, Raw, ReqBody)
 import Servant.HTML.Lucid (HTML)
 import Yaptape.Domain (Mixtape, MixtapeId, ShareCode, StoredMixtape)
 import Yaptape.Form (CreateMixtapeForm)
@@ -37,7 +37,7 @@ type CreatePageApi = "create" :> (Get '[HTML] (Html ()) :<|> (ReqBody '[FormUrlE
 
 type MixtapePageApi = "m" :> Capture "shareCode" ShareCode :> Get '[HTML] (Html ())
 
-type AppApi = HealthApi :<|> ("api" :> MixtapeApi) :<|> (PagesApi :<|> (CreatePageApi :<|> MixtapePageApi))
+type AppApi = HealthApi :<|> ("api" :> MixtapeApi) :<|> (PagesApi :<|> (CreatePageApi :<|> MixtapePageApi)) :<|> ("assets" :> Raw)
 
 appApi :: Proxy AppApi
 appApi = Proxy

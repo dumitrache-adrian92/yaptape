@@ -19,19 +19,28 @@ library
   exposed-modules:
       Yaptape
       Yaptape.Api
+      Yaptape.Db
+      Yaptape.Db.Schema
+      Yaptape.Domain
       Yaptape.Server
+      Yaptape.YouTube
   other-modules:
-      Paths_yaptape
-  autogen-modules:
-      Paths_yaptape
+      Yaptape.YouTube.Internal
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
   build-depends:
       aeson
     , base
+    , bytestring
+    , http-types
+    , lucid
+    , network-uri
     , servant
+    , servant-lucid
     , servant-server
+    , text
+    , time
     , transformers
     , wai
     , warp
@@ -49,8 +58,15 @@ executable yaptape-exe
   build-depends:
       aeson
     , base
+    , bytestring
+    , http-types
+    , lucid
+    , network-uri
     , servant
+    , servant-lucid
     , servant-server
+    , text
+    , time
     , transformers
     , wai
     , warp
@@ -62,7 +78,9 @@ test-suite yaptape-test
   main-is: Spec.hs
   other-modules:
       Integration.HealthSpec
+      Unit.DbSpec
       Unit.HealthSpec
+      Unit.YouTubeSpec
       Paths_yaptape
   autogen-modules:
       Paths_yaptape
@@ -72,12 +90,18 @@ test-suite yaptape-test
   build-depends:
       aeson
     , base
+    , bytestring
     , hspec
     , http-client
     , http-types
+    , lucid
+    , network-uri
     , servant
     , servant-client
+    , servant-lucid
     , servant-server
+    , text
+    , time
     , transformers
     , wai
     , warp >=3.2.4

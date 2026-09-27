@@ -1,4 +1,4 @@
-module Yaptape (run) where
+module Yaptape (run, mkApp) where
 
 import Network.Wai (Application)
 import Network.Wai.Handler.Warp

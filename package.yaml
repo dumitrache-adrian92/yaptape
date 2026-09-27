@@ -33,7 +33,8 @@ executables:
 library:
   source-dirs:
     - src
-
+  other-modules:
+    - Yaptape.YouTube.Internal
 
 tests:
   yaptape-test:
@@ -59,3 +60,10 @@ dependencies:
 - aeson
 - wai
 - warp
+- text
+- time
+- bytestring
+- network-uri
+- http-types
+- lucid
+- servant-lucid

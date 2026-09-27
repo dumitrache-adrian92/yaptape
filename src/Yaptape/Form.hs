@@ -17,6 +17,7 @@ data CreateMixtapeForm = CreateMixtapeForm
   { formTitle :: Text
   , formDescription :: Maybe Text
   , formVideoUrls :: [Text]
+  , formTitles :: [Text]
   , formNotes :: [Text]
   } deriving (Show, Eq)
 
@@ -25,6 +26,7 @@ instance FromForm CreateMixtapeForm where
     <$> lookupUnique "title" form
     <*> lookupMaybe "description" form
     <*> pure (lookupAll "videoUrls" form)
+    <*> pure (lookupAll "titles" form)
     <*> pure (lookupAll "notes" form)
 
 createMixtapeFromForm :: CreateMixtapeForm -> Either Text Mixtape
@@ -33,14 +35,14 @@ createMixtapeFromForm form
   | null form.formNotes = Left "Add at least one track."
   | length form.formVideoUrls /= length form.formNotes = Left "Each track needs a YouTube link and a note."
   | otherwise = do
-      parsedTracks <- traverse makeTrack (zip form.formVideoUrls form.formNotes)
+      parsedTracks <- traverse makeTrack (zip3 form.formVideoUrls form.formNotes (form.formTitles <> repeat ""))
       pure (Mixtape (T.strip form.formTitle) (nonEmpty form.formDescription) parsedTracks)
   where
-    makeTrack (url, trackNote)
+    makeTrack (url, trackNote, trackTitle)
       | T.null (T.strip trackNote) = Left "Add a note for every track."
       | otherwise = do
           parsedVideoId <- parseYouTubeUrl url
-          pure (Track parsedVideoId Nothing Nothing (T.strip trackNote))
+          pure (Track parsedVideoId (nonEmpty (Just trackTitle)) Nothing (T.strip trackNote))
 
 nonEmpty :: Maybe Text -> Maybe Text
 nonEmpty = (>>= \value -> if T.null (T.strip value) then Nothing else Just (T.strip value))

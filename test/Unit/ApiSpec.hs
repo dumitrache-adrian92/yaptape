@@ -39,7 +39,9 @@ import Yaptape.Domain
 import Servant.API (ToHttpApiData (toUrlPiece))
 import Servant.API (FromHttpApiData (parseUrlPiece))
 import Yaptape.Server (MixtapeStore (..), appForStore)
+import Yaptape.Form (CreateMixtapeForm (..), createMixtapeFromForm)
 import Yaptape.YouTube (mkYouTubeVideoId)
+import Web.FormUrlEncoded (urlDecodeAsForm)
 
 postMixtape :: Mixtape -> ClientM (Headers '[Header "Location" Text] StoredMixtape)
 postMixtape = client mixtapeApi
@@ -68,6 +70,23 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       blankTitle `shouldBe` Nothing
       blankNote `shouldBe` Nothing
       noTracks `shouldBe` Nothing
+
+    it "uses the title looked up from YouTube as the track title" $ do
+      let form = CreateMixtapeForm "Tape" Nothing
+            ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
+            ["Never Gonna Give You Up"]
+            ["A note"]
+      case createMixtapeFromForm form of
+        Left err -> expectationFailure (T.unpack err)
+        Right mixtape -> case mixtape.tracks of
+          [Track _ (Just trackTitle) _ _] -> trackTitle `shouldBe` "Never Gonna Give You Up"
+          _ -> expectationFailure "Expected the YouTube title to be the track title"
+
+    it "keeps titles aligned with repeated video and note form fields" $ do
+      let payload = BL8.pack "title=Tape&videoUrls=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&videoUrls=https%3A%2F%2Fyoutu.be%2FM7lc1UVf-VE&titles=First+title&titles=Second+title&notes=First+note&notes=Second+note"
+      case (urlDecodeAsForm payload :: Either Text CreateMixtapeForm) >>= createMixtapeFromForm of
+        Left err -> expectationFailure (T.unpack err)
+        Right mixtape -> map (\(Track _ trackTitle _ _) -> trackTitle) mixtape.tracks `shouldBe` [Just "First title", Just "Second title"]
 
   it "handles POST /api/mixtapes without PostgreSQL" $ do
     let video = requiredEither (mkYouTubeVideoId "dQw4w9WgXcQ")
@@ -103,11 +122,13 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       createResponse <- httpLbs createRequest manager
       statusCode (responseStatus createResponse) `shouldBe` 200
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
+      BL8.unpack (responseBody createResponse) `shouldContain` "youtube.com/oembed"
+      BL8.unpack (responseBody createResponse) `shouldContain` "Track title (filled from YouTube)"
       formRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")
       let formRequest = formRequestBase
             { method = "POST"
             , requestHeaders = [("Content-Type", "application/x-www-form-urlencoded")]
-            , requestBody = RequestBodyLBS "title=From+the+browser&videoUrls=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&notes=Remember+this+one"
+            , requestBody = RequestBodyLBS "title=From+the+browser&videoUrls=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&titles=Never+Gonna+Give+You+Up&notes=Remember+this+one"
             }
       formResponse <- httpLbs formRequest manager
       statusCode (responseStatus formResponse) `shouldBe` 200
@@ -139,6 +160,10 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       pageResponse <- httpLbs pageRequest manager
       statusCode (responseStatus pageResponse) `shouldBe` 200
       BL8.unpack (responseBody pageResponse) `shouldContain` "A note"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "youtube.com/iframe_api"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "Start listening"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "data-video-id=\"dQw4w9WgXcQ\""
+      BL8.unpack (responseBody pageResponse) `shouldContain` "listening-shell"
 
 requiredMaybe :: Maybe a -> a
 requiredMaybe = maybe (error "invalid UUID fixture") id

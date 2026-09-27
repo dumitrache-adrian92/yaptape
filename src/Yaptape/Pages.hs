@@ -44,11 +44,11 @@ renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" 
       div_ [class_ "tracks-heading"] $ do
         h2_ "Tracklist"
         button_ [type_ "button", id_ "add-track", class_ "quiet-button"] "+ Add a track"
-      div_ [id_ "track-list"] (mapM_ (trackRow True) (formRows previousForm))
-      template_ [id_ "track-template"] (trackRow False Nothing)
+      div_ [id_ "track-list"] (mapM_ trackRow (formRows previousForm))
+      template_ [id_ "track-template"] (trackRow Nothing)
       button_ [type_ "submit", class_ "button submit-button"] "Create mixtape"
       p_ [class_ "fine-print"] "You can rearrange tracks before sharing your tape."
-  script_ [src_ "https://unpkg.com/htmx.org@2.0.8", defer_ ""] (mempty :: Html ())
+  script_ [src_ "/assets/js/htmx.min.js", defer_ "", makeAttribute "integrity" "sha256-Iig+9oy3VFkU8KiKG97cclanA9HVgMHSVSF9ClDTExM=", makeAttribute "crossorigin" "anonymous"] (mempty :: Html ())
   script_ [src_ "/assets/js/create.js", defer_ ""] (mempty :: Html ())
 
 formRows :: Maybe CreateMixtapeForm -> [Maybe (Text, Text, Text)]
@@ -57,8 +57,8 @@ formRows (Just form) = case zip3 form.formVideoUrls form.formNotes (form.formTit
   [] -> [Nothing]
   entries -> map Just entries
 
-trackRow :: Bool -> Maybe (Text, Text, Text) -> Html ()
-trackRow removable savedValues = div_ [class_ "track-row"] $ do
+trackRow :: Maybe (Text, Text, Text) -> Html ()
+trackRow savedValues = div_ [class_ "track-row"] $ do
   div_ [class_ "track-number"] "♪"
   div_ [class_ "track-fields"] $ do
     input_ ([name_ "videoUrls", type_ "url", placeholder_ "YouTube video link", required_ "", class_ "video-url"] <> maybe [] (\(url, _, _) -> [value_ url]) savedValues)
@@ -68,7 +68,7 @@ trackRow removable savedValues = div_ [class_ "track-row"] $ do
   div_ [class_ "row-actions"] $ do
     button_ [type_ "button", makeAttribute "data-move" "up", class_ "icon-button", title_ "Move track up"] "↑"
     button_ [type_ "button", makeAttribute "data-move" "down", class_ "icon-button", title_ "Move track down"] "↓"
-    if removable then button_ [type_ "button", makeAttribute "data-remove" "", class_ "icon-button remove-button", title_ "Remove track"] "×" else mempty
+    button_ [type_ "button", makeAttribute "data-remove" "", class_ "icon-button remove-button", title_ "Remove track"] "×"
 
 renderCreatedPage :: StoredMixtape -> Html ()
 renderCreatedPage mixtape = layout "Your mixtape is ready · Yaptape" $ main_ [class_ "page-shell"] $ do
@@ -107,7 +107,7 @@ renderMixtapePage mixtape = layout (mixtape.title <> " · Yaptape") $ div_ [clas
         div_ [class_ "video-frame"] (div_ [id_ "youtube-player"] mempty)
         div_ [class_ "transport"] $ do
           button_ [type_ "button", id_ "previous-track", class_ "transport-button", makeAttribute "aria-label" "Play previous track"] "Previous"
-          button_ [type_ "button", id_ "toggle-playback", class_ "button play-button"] "Play"
+          button_ [type_ "button", id_ "toggle-playback", class_ "button play-button", makeAttribute "aria-pressed" "false"] "Play"
           button_ [type_ "button", id_ "next-track", class_ "transport-button", makeAttribute "aria-label" "Play next track"] "Next"
         p_ [id_ "playback-status", class_ "playback-status", role_ "status", makeAttribute "aria-live" "polite"] "Loading the first track…"
         button_ [type_ "button", id_ "start-playback", class_ "button start-button", hidden_ ""] "Start listening"

@@ -11,7 +11,7 @@ module Yaptape.Db.Postgres
 import Control.Monad (forM)
 import Data.Functor.Contravariant ((>$<))
 import Data.Int (Int32)
-import Data.Maybe (fromMaybe)
+import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Time (UTCTime)
@@ -104,52 +104,45 @@ getMixtape pool mixtapeKey = Pool.use pool $ Transactions.transaction
   Transactions.ReadCommitted
   Transactions.Read
   (do
-    maybeMixtapeRow <- Transaction.statement (unMixtapeId mixtapeKey) selectMixtape
-    case maybeMixtapeRow of
-      Nothing -> pure Nothing
-      Just (rawMixtapeId, tapeTitle, tapeDescription, createdTime) -> do
-        rawTracks <- Transaction.statement (unMixtapeId mixtapeKey) selectTracks
-        pure $ Just StoredMixtape
+    rows <- Transaction.statement (unMixtapeId mixtapeKey) selectMixtapeWithTracks
+    pure $ case rows of
+      [] -> Nothing
+      (rawMixtapeId, tapeTitle, tapeDescription, createdTime, _, _, _, _, _) : _ ->
+        Just StoredMixtape
           { mixtapeId = databaseMixtapeId rawMixtapeId
           , title = tapeTitle
           , description = tapeDescription
           , createdAt = createdTime
-          , tracks = map toStoredTrack rawTracks
+          , tracks = mapMaybe toStoredTrack rows
           })
   where
-    toStoredTrack (rawTrackId, rawVideoId, trackTitle, performer, trackNote) = StoredTrack
+    toStoredTrack (_, _, _, _, Just rawTrackId, Just rawVideoId, trackTitle, performer, Just trackNote) = Just StoredTrack
       { trackId = databaseTrackId rawTrackId
       , videoId = databaseVideoId rawVideoId
       , title = trackTitle
       , artist = performer
       , note = trackNote
       }
+    toStoredTrack _ = Nothing
 
-databaseVideoId :: Text -> YouTubeVideoId
-databaseVideoId raw = either (error . show) id (mkYouTubeVideoId raw)
-
-selectMixtape :: Statement.Statement Text (Maybe (Text, Text, Maybe Text, UTCTime))
-selectMixtape = Statement.Statement sql encoder decoder True
+selectMixtapeWithTracks :: Statement.Statement Text [(Text, Text, Maybe Text, UTCTime, Maybe Text, Maybe Text, Maybe Text, Maybe Text, Maybe Text)]
+selectMixtapeWithTracks = Statement.Statement sql encoder decoder True
   where
-    sql = "SELECT id::text, title, description, created_at FROM mixtapes WHERE id = $1::uuid"
+    sql = "SELECT m.id::text, m.title, m.description, m.created_at, t.id::text, t.video_id, t.title, t.artist, t.note FROM mixtapes m LEFT JOIN tracks t ON t.mixtape_id = m.id WHERE m.id = $1::uuid ORDER BY t.track_order"
     encoder = Encoders.param (Encoders.nonNullable Encoders.text)
-    decoder = Decoders.rowMaybe $ (,,,)
+    decoder = Decoders.rowList $ (,,,,,,,,)
       <$> Decoders.column (Decoders.nonNullable Decoders.text)
       <*> Decoders.column (Decoders.nonNullable Decoders.text)
       <*> Decoders.column (Decoders.nullable Decoders.text)
       <*> Decoders.column (Decoders.nonNullable Decoders.timestamptz)
+      <*> Decoders.column (Decoders.nullable Decoders.text)
+      <*> Decoders.column (Decoders.nullable Decoders.text)
+      <*> Decoders.column (Decoders.nullable Decoders.text)
+      <*> Decoders.column (Decoders.nullable Decoders.text)
+      <*> Decoders.column (Decoders.nullable Decoders.text)
 
-selectTracks :: Statement.Statement Text [(Text, Text, Maybe Text, Maybe Text, Text)]
-selectTracks = Statement.Statement sql encoder decoder True
-  where
-    sql = "SELECT id::text, video_id, title, artist, note FROM tracks WHERE mixtape_id = $1::uuid ORDER BY track_order"
-    encoder = Encoders.param (Encoders.nonNullable Encoders.text)
-    decoder = Decoders.rowList $ (,,,,)
-      <$> Decoders.column (Decoders.nonNullable Decoders.text)
-      <*> Decoders.column (Decoders.nonNullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nonNullable Decoders.text)
+databaseVideoId :: Text -> YouTubeVideoId
+databaseVideoId raw = either (error . show) id (mkYouTubeVideoId raw)
 
 insertMixtape :: Statement.Statement (Text, Maybe Text) (Text, UTCTime)
 insertMixtape = Statement.Statement sql encoder decoder True

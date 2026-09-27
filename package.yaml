@@ -8,6 +8,17 @@ extra-source-files:
 - README.md
 - compose.yaml
 - db/migrations/001_create_mixtapes.sql
+- db/migrations/002_add_field_limits.sql
+- static/css/app.css
+- static/js/copy-link.js
+- static/js/create.js
+- static/js/htmx.min.js
+- static/js/HTMX-LICENSE.txt
+- static/js/playback.js
+
+data-files:
+- static/css/app.css
+- static/js/*.js
 
 ghc-options:
 - -Wall
@@ -58,6 +69,7 @@ tests:
 
 dependencies:
 - base
+- filepath
 - servant
 - servant-server
 - transformers

@@ -27,6 +27,7 @@ import Control.Monad (when)
 import qualified Data.ByteString.Base64.URL as Base64Url
 import qualified Data.ByteString.Lazy as LBS
 import Data.Aeson (FromJSON (..), ToJSON (..), Value (String), withText, withObject, (.:), (.:?))
+import Data.Aeson.Types (Parser)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
@@ -123,7 +124,10 @@ instance FromJSON Track where
     performer <- o .:? "artist"
     trackNote <- o .: "note"
     when (T.null (T.strip trackNote)) (fail "note must not be empty")
-    pure (Track video trackTitle performer trackNote)
+    validateOptional "track title" 300 trackTitle
+    validateOptional "artist" 200 performer
+    when (T.length trackNote > 2000) (fail "note must be at most 2000 characters")
+    pure (Track video (stripMaybe trackTitle) (stripMaybe performer) (T.strip trackNote))
 
 -- | A track that has been persisted, enriched with its unique TrackId.
 data StoredTrack = StoredTrack
@@ -150,7 +154,19 @@ instance FromJSON Mixtape where
     tapeTracks <- o .: "tracks"
     when (T.null (T.strip tapeTitle)) (fail "title must not be empty")
     when (null tapeTracks) (fail "a mixtape must have at least one track")
-    pure (Mixtape tapeTitle tapeDescription tapeTracks)
+    when (T.length (T.strip tapeTitle) > 120) (fail "title must be at most 120 characters")
+    when (length tapeTracks > 100) (fail "a mixtape can have at most 100 tracks")
+    validateOptional "description" 500 tapeDescription
+    pure (Mixtape (T.strip tapeTitle) (stripMaybe tapeDescription) tapeTracks)
+
+validateOptional :: String -> Int -> Maybe Text -> Parser ()
+validateOptional _ _ Nothing = pure ()
+validateOptional label limit (Just value)
+  | T.length (T.strip value) > limit = fail (label <> " must be at most " <> show limit <> " characters")
+  | otherwise = pure ()
+
+stripMaybe :: Maybe Text -> Maybe Text
+stripMaybe = fmap T.strip
 
 -- | A mixtape enriched with server-side metadata (ID, creation timestamp, and stored tracks).
 data StoredMixtape = StoredMixtape

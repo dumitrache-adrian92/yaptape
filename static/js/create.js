@@ -55,7 +55,10 @@ function lookupTitle(input,id) {
 document.addEventListener('input',function(event) {
   if(!event.target.matches('.video-url'))return;
   const input=event.target,row=input.closest('.track-row'),titleField=row.querySelector('.track-title'),hint=row.querySelector('.url-hint');
-  if(input.value!==input.dataset.lookupUrl)titleField.value='';
+  if(input.value!==input.dataset.lookupUrl) {
+    input.dataset.lookupVersion=String(Number(input.dataset.lookupVersion||0)+1);
+    titleField.value=''
+  }
   hint.textContent=input.value?(youtubeVideoId(input.value)?'YouTube link looks good.':'Use a youtube.com or youtu.be video link.'):'YouTube links from youtube.com or youtu.be';
   hint.classList.toggle('url-valid',Boolean(input.value&&youtubeVideoId(input.value)));
   hint.classList.toggle('url-invalid',Boolean(input.value&&!youtubeVideoId(input.value)))
@@ -68,6 +71,7 @@ document.addEventListener('change',function(event) {
 }
 );
 const createForm=document.querySelector('form[action="/create"]');
+const trackList=document.querySelector('#track-list');
 createForm.addEventListener('submit',function(event) {
   const inputs=Array.from(createForm.querySelectorAll('.video-url'));
   const requests=[];
@@ -84,10 +88,11 @@ createForm.addEventListener('submit',function(event) {
 }
 );
 document.addEventListener('click',function(event) {
+  if(!(event.target instanceof Element))return;
   const add=event.target.closest('#add-track');
   if(add) {
-    const list=document.querySelector('#track-list'),row=document.querySelector('#track-template').content.firstElementChild.cloneNode(true);
-    list.append(row);
+    const row=document.querySelector('#track-template').content.firstElementChild.cloneNode(true);
+    trackList.append(row);
     row.querySelector('input').focus();
     return
   }
@@ -100,8 +105,13 @@ document.addEventListener('click',function(event) {
   }
   const remove=event.target.closest('[data-remove]');
   if(remove) {
-    const rows=document.querySelectorAll('#track-list .track-row');
-    if(rows.length>1)remove.closest('.track-row').remove()
+    event.preventDefault();
+    event.stopPropagation();
+
+    const row=remove.closest('.track-row');
+    if(!trackList||!row||row.parentElement!==trackList)return;
+
+    trackList.removeChild(row)
   }
   
 }

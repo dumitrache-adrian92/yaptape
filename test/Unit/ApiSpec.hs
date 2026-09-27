@@ -6,11 +6,12 @@
 module Unit.ApiSpec (spec) where
 
 import Data.Time (UTCTime (..), fromGregorian)
+import Data.List (isPrefixOf, tails)
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Aeson (decode)
-import Network.HTTP.Client (RequestBody (RequestBodyLBS), defaultManagerSettings, httpLbs, newManager, parseRequest, requestBody, requestHeaders, method, responseBody, responseStatus)
+import Network.HTTP.Client (RequestBody (RequestBodyLBS), defaultManagerSettings, httpLbs, newManager, parseRequest, requestBody, requestHeaders, method, responseBody, responseHeaders, responseStatus)
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import Network.HTTP.Types (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
@@ -118,12 +119,25 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       landingResponse <- httpLbs landingRequest manager
       statusCode (responseStatus landingResponse) `shouldBe` 200
       BL8.unpack (responseBody landingResponse) `shouldContain` "Make a mixtape that says a little more"
+      oversizedRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")
+      let oversizedRequest = oversizedRequestBase
+            { method = "POST"
+            , requestHeaders = [("Content-Type", "application/x-www-form-urlencoded")]
+            , requestBody = RequestBodyLBS (BL8.replicate (1024 * 1024 + 1) 'x')
+            }
+      oversizedResponse <- httpLbs oversizedRequest manager
+      statusCode (responseStatus oversizedResponse) `shouldBe` 413
+      let oversizedHeaders = responseHeaders oversizedResponse
+      lookup "Content-Security-Policy" oversizedHeaders `shouldSatisfy` maybe False (const True)
+      lookup "X-Content-Type-Options" oversizedHeaders `shouldSatisfy` maybe False (const True)
+      lookup "Referrer-Policy" oversizedHeaders `shouldSatisfy` maybe False (const True)
       createRequest <- parseRequest ("http://localhost:" <> show port <> "/create")
       createResponse <- httpLbs createRequest manager
       statusCode (responseStatus createResponse) `shouldBe` 200
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
       BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js"
       BL8.unpack (responseBody createResponse) `shouldContain` "Track title (filled from YouTube)"
+      countOccurrences "data-remove" (BL8.unpack (responseBody createResponse)) `shouldBe` 2
       createScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/create.js")
       createScriptResponse <- httpLbs createScriptRequest manager
       statusCode (responseStatus createScriptResponse) `shouldBe` 200
@@ -182,3 +196,6 @@ requiredMaybe = maybe (error "invalid UUID fixture") id
 
 requiredEither :: Either e a -> a
 requiredEither = either (const (error "invalid video ID fixture")) id
+
+countOccurrences :: String -> String -> Int
+countOccurrences needle = length . filter (isPrefixOf needle) . tails

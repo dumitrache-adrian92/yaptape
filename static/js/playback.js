@@ -72,12 +72,14 @@
           if(event.data===YT.PlayerState.PLAYING) {
             deck.dataset.playing='true';
             playButton.textContent='Pause';
+            playButton.setAttribute('aria-pressed','true');
             startButton.hidden=true;
             announce('Now playing '+queue[current].dataset.trackTitle)
           }
           else if(event.data===YT.PlayerState.PAUSED) {
             deck.dataset.playing='false';
             playButton.textContent='Play';
+            playButton.setAttribute('aria-pressed','false');
             announce('Paused')
           }
           else if(event.data===YT.PlayerState.ENDED) {
@@ -85,6 +87,7 @@
             if(current<queue.length-1)selectTrack(current+1);
             else {
               playButton.textContent='Play';
+              playButton.setAttribute('aria-pressed','false');
               announce('You reached the end of the tape.')
             }
             
@@ -94,12 +97,14 @@
         ,onAutoplayBlocked:function() {
           deck.dataset.playing='false';
           playButton.textContent='Play';
+          playButton.setAttribute('aria-pressed','false');
           startButton.hidden=false;
           announce('Your browser blocked autoplay. Press Start listening to play the tape.')
         }
         ,onError:function() {
           deck.dataset.playing='false';
           playButton.textContent='Play';
+          playButton.setAttribute('aria-pressed','false');
           startButton.hidden=false;
           announce('This video cannot be played here. Try another track.')
         }

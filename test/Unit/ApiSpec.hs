@@ -10,7 +10,7 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
 import Data.Aeson (decode)
-import Network.HTTP.Client (defaultManagerSettings, httpLbs, newManager, parseRequest, responseBody, responseStatus)
+import Network.HTTP.Client (RequestBody (RequestBodyLBS), defaultManagerSettings, httpLbs, newManager, parseRequest, requestBody, requestHeaders, method, responseBody, responseStatus)
 import qualified Data.ByteString.Lazy.Char8 as BL8
 import Network.HTTP.Types (statusCode)
 import Network.Wai.Handler.Warp (testWithApplication)
@@ -95,6 +95,34 @@ spec = describe "Mixtape routes with an in-memory store" $ do
     testWithApplication (pure app) $ \port -> do
       manager <- newManager defaultManagerSettings
       let env = mkClientEnv manager (BaseUrl Http "localhost" port "")
+      landingRequest <- parseRequest ("http://localhost:" <> show port <> "/")
+      landingResponse <- httpLbs landingRequest manager
+      statusCode (responseStatus landingResponse) `shouldBe` 200
+      BL8.unpack (responseBody landingResponse) `shouldContain` "Make a mixtape that says a little more"
+      createRequest <- parseRequest ("http://localhost:" <> show port <> "/create")
+      createResponse <- httpLbs createRequest manager
+      statusCode (responseStatus createResponse) `shouldBe` 200
+      BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
+      formRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")
+      let formRequest = formRequestBase
+            { method = "POST"
+            , requestHeaders = [("Content-Type", "application/x-www-form-urlencoded")]
+            , requestBody = RequestBodyLBS "title=From+the+browser&videoUrls=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&notes=Remember+this+one"
+            }
+      formResponse <- httpLbs formRequest manager
+      statusCode (responseStatus formResponse) `shouldBe` 200
+      BL8.unpack (responseBody formResponse) `shouldContain` "Your mixtape is ready"
+      BL8.unpack (responseBody formResponse) `shouldContain` "/m/"
+      invalidFormBase <- parseRequest ("http://localhost:" <> show port <> "/create")
+      let invalidForm = invalidFormBase
+            { method = "POST"
+            , requestHeaders = [("Content-Type", "application/x-www-form-urlencoded")]
+            , requestBody = RequestBodyLBS "title=Kept+form&videoUrls=https%3A%2F%2Fexample.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&notes=Kept+note"
+            }
+      invalidFormResponse <- httpLbs invalidForm manager
+      statusCode (responseStatus invalidFormResponse) `shouldBe` 200
+      BL8.unpack (responseBody invalidFormResponse) `shouldContain` "Enter a YouTube video link"
+      BL8.unpack (responseBody invalidFormResponse) `shouldContain` "Kept form"
       createdResult <- runClientM (postMixtape mixtape) env
       case createdResult of
         Left err -> expectationFailure (show err)

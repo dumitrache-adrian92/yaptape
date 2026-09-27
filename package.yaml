@@ -69,6 +69,7 @@ dependencies:
 - bytestring
 - network-uri
 - http-types
+- http-api-data
 - lucid
 - servant-lucid
 - hasql

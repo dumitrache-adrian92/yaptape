@@ -25,6 +25,8 @@ library
       Yaptape.Db.Postgres
       Yaptape.Db.Schema
       Yaptape.Domain
+      Yaptape.Form
+      Yaptape.Pages
       Yaptape.Server
       Yaptape.YouTube
   other-modules:
@@ -40,6 +42,7 @@ library
     , hasql
     , hasql-pool
     , hasql-transaction
+    , http-api-data
     , http-types
     , lucid
     , network-uri
@@ -71,6 +74,7 @@ executable yaptape-exe
     , hasql
     , hasql-pool
     , hasql-transaction
+    , http-api-data
     , http-types
     , lucid
     , network-uri
@@ -111,6 +115,7 @@ test-suite yaptape-test
     , hasql-pool
     , hasql-transaction
     , hspec
+    , http-api-data
     , http-client
     , http-types
     , lucid

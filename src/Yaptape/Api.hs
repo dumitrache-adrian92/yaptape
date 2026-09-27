@@ -18,9 +18,10 @@ module Yaptape.Api
 import Data.Proxy (Proxy (..))
 import Lucid (Html)
 import Data.Text (Text)
-import Servant.API ((:<|>) (..), (:>), Capture, Get, Header, Headers, JSON, PlainText, PostCreated, ReqBody)
+import Servant.API ((:<|>) (..), (:>), Capture, FormUrlEncoded, Get, Header, Headers, JSON, PlainText, Post, PostCreated, ReqBody)
 import Servant.HTML.Lucid (HTML)
 import Yaptape.Domain (Mixtape, MixtapeId, ShareCode, StoredMixtape)
+import Yaptape.Form (CreateMixtapeForm)
 
 type HealthApi = "health" :> Get '[PlainText] String
 
@@ -32,9 +33,11 @@ type GetMixtapeApi = Capture "mixtapeId" MixtapeId :> Get '[JSON] StoredMixtape
 
 type PagesApi = Get '[HTML] (Html ())
 
+type CreatePageApi = "create" :> (Get '[HTML] (Html ()) :<|> (ReqBody '[FormUrlEncoded] CreateMixtapeForm :> Post '[HTML] (Html ())))
+
 type MixtapePageApi = "m" :> Capture "shareCode" ShareCode :> Get '[HTML] (Html ())
 
-type AppApi = HealthApi :<|> ("api" :> MixtapeApi) :<|> (PagesApi :<|> MixtapePageApi)
+type AppApi = HealthApi :<|> ("api" :> MixtapeApi) :<|> (PagesApi :<|> (CreatePageApi :<|> MixtapePageApi))
 
 appApi :: Proxy AppApi
 appApi = Proxy

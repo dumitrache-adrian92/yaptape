@@ -15,9 +15,8 @@ module Yaptape.Server
 
 import Control.Monad.IO.Class (liftIO)
 import Data.Aeson (encode, object, (.=))
-import Data.Maybe (fromMaybe)
 import Data.Text (Text)
-import Lucid (Html, a_, body_, h1_, head_, href_, html_, li_, main_, p_, title_, toHtml, ul_)
+import Lucid (Html)
 import Network.Wai (Application)
 import Network.HTTP.Types.Header (hContentType)
 import Servant
@@ -34,6 +33,7 @@ import Servant
   , throwError
   )
 import Servant (serve)
+import Servant.API (ToHttpApiData (toUrlPiece))
 import qualified Hasql.Pool as Pool
 import System.IO (hPutStrLn, stderr)
 import Yaptape.Api (AppApi)
@@ -43,13 +43,12 @@ import Yaptape.Domain
   , MixtapeId
   , ShareCode
   , StoredMixtape (..)
-  , StoredTrack (..)
   , mixtapeIdFromShareCode
   , shareCodeFor
   )
-import Yaptape.YouTube (unYouTubeVideoId)
-import Servant.API (ToHttpApiData (toUrlPiece))
 import Yaptape.Api (appApi)
+import Yaptape.Form (CreateMixtapeForm, createMixtapeFromForm)
+import Yaptape.Pages (renderCreatedPage, renderCreatePage, renderLandingPage, renderMixtapePage)
 
 data StoreError = StoreUnavailable | StoreFailure
   deriving (Show, Eq)
@@ -77,15 +76,27 @@ appForStore = serve appApi . server
 
 server :: MixtapeStore -> Server AppApi
 server store = healthHandler :<|> (createMixtapeHandler store :<|> getMixtapeHandler store) :<|>
-  (pageHandler :<|> getSharedMixtapeHandler store)
+  (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler store) :<|> getSharedMixtapeHandler store))
 
 healthHandler :: Handler String
 healthHandler = return "https://www.youtube.com/watch?v=_rVvjslF6M8"
 
 pageHandler :: Handler (Html ())
-pageHandler = pure $ html_ $ do
-  head_ (title_ "Yaptape")
-  body_ (main_ (h1_ "Yaptape"))
+pageHandler = pure renderLandingPage
+
+createPageHandler :: Handler (Html ())
+createPageHandler = pure (renderCreatePage Nothing Nothing)
+
+submitCreateFormHandler :: MixtapeStore -> CreateMixtapeForm -> Handler (Html ())
+submitCreateFormHandler store form = case createMixtapeFromForm form of
+  Left validationError -> pure (renderCreatePage (Just validationError) (Just form))
+  Right mixtape -> do
+    result <- liftIO (storeCreateMixtape store mixtape)
+    case result of
+      Left storeError -> do
+        liftIO $ hPutStrLn stderr ("Mixtape persistence failed: " ++ show storeError)
+        pure (renderCreatePage (Just "We could not save your mixtape. Please try again.") (Just form))
+      Right created -> pure (renderCreatedPage created)
 
 createMixtapeHandler
   :: MixtapeStore
@@ -120,22 +131,6 @@ getSharedMixtapeHandler store shareCode = do
       throwError (storeErrorResponse storeError)
     Right Nothing -> throwError err404
     Right (Just mixtape) -> pure (renderMixtapePage mixtape)
-
-renderMixtapePage :: StoredMixtape -> Html ()
-renderMixtapePage mixtape = html_ $ do
-  head_ (title_ (toHtml mixtape.title))
-  body_ $ main_ $ do
-    h1_ (toHtml mixtape.title)
-    maybe (pure ()) (p_ . toHtml) mixtape.description
-    ul_ (mapM_ renderTrack mixtape.tracks)
-
-renderTrack :: StoredTrack -> Html ()
-renderTrack track = li_ $ do
-  let youtubeUrl = "https://www.youtube.com/watch?v=" <> unYouTubeVideoId track.videoId
-      label = fromMaybe (unYouTubeVideoId track.videoId) track.title
-  a_ [href_ youtubeUrl] (toHtml label)
-  maybe (pure ()) (p_ . toHtml) track.artist
-  p_ (toHtml track.note)
 
 storeErrorResponse :: StoreError -> ServerError
 storeErrorResponse storeError =

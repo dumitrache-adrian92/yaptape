@@ -39,17 +39,25 @@ The browser uses YouTube’s IFrame API and oEmbed service and Google Fonts. htm
 
 The Playwright browser tests exercise the create page in Chromium. They cover adding, reordering, and removing tracks, URL feedback, and YouTube title lookup. The oEmbed response is stubbed so the test does not depend on YouTube being available.
 
-Start the database and app using the local setup steps above. In another terminal, install the JavaScript test dependencies and Chromium once:
+Install the JavaScript test dependencies and Chromium once:
 
 ```sh
 npm install
 npx playwright install chromium
 ```
 
-Then run the browser suite:
+Run the browser suite with:
 
 ```sh
 npm run test:e2e
 ```
 
-The app must be reachable at `http://127.0.0.1:3000`. Set `YAPTAPE_URL` to use a different local app URL.
+This starts PostgreSQL, applies the idempotent migrations, starts the app if it is not already healthy, and then runs Playwright. The app process is stopped when the suite finishes; PostgreSQL is left running. Use `PORT` to select the app port.
+
+Run only the Haskell unit tests with:
+
+```sh
+npm run test:unit
+```
+
+This also starts PostgreSQL and applies the migrations before running the unit-test group. Both commands use the development database credentials from `compose.yaml`; set `POSTGRES_PASSWORD` and `DATABASE_PASSWORD` together if you use a different password.

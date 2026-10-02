@@ -2,7 +2,8 @@
   "name": "yaptape-browser-tests",
   "private": true,
   "scripts": {
-    "test:e2e": "playwright test"
+    "test:e2e": "bash scripts/test-e2e.sh",
+    "test:unit": "bash scripts/test-unit.sh"
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0"

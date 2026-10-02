@@ -13,6 +13,8 @@ module Yaptape.Api
   , pagesApi
   , MixtapePageApi
   , mixtapePageApi
+  , CreatedPageApi
+  , createdPageApi
   ) where
 
 import Data.Proxy (Proxy (..))
@@ -35,9 +37,11 @@ type PagesApi = Get '[HTML] (Html ())
 
 type CreatePageApi = "create" :> (Get '[HTML] (Html ()) :<|> (ReqBody '[FormUrlEncoded] CreateMixtapeForm :> Post '[HTML] (Html ())))
 
+type CreatedPageApi = "created" :> Capture "shareCode" ShareCode :> Get '[HTML] (Html ())
+
 type MixtapePageApi = "m" :> Capture "shareCode" ShareCode :> Get '[HTML] (Html ())
 
-type AppApi = HealthApi :<|> ("api" :> MixtapeApi) :<|> (PagesApi :<|> (CreatePageApi :<|> MixtapePageApi)) :<|> ("assets" :> Raw)
+type AppApi = HealthApi :<|> ("api" :> MixtapeApi) :<|> (PagesApi :<|> (CreatePageApi :<|> (CreatedPageApi :<|> MixtapePageApi))) :<|> ("assets" :> Raw)
 
 appApi :: Proxy AppApi
 appApi = Proxy
@@ -53,6 +57,9 @@ getMixtapeApi = Proxy
 
 pagesApi :: Proxy PagesApi
 pagesApi = Proxy
+
+createdPageApi :: Proxy CreatedPageApi
+createdPageApi = Proxy
 
 mixtapePageApi :: Proxy MixtapePageApi
 mixtapePageApi = Proxy

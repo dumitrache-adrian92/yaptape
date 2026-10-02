@@ -11,6 +11,7 @@ module Yaptape.Server
   , appForStoreAt
   , healthHandler
   , createMixtapeHandler
+  , createdPageHandler
   , getSharedMixtapeHandler
   ) where
 
@@ -20,9 +21,19 @@ import Data.IORef (newIORef, atomicModifyIORef')
 import qualified Data.ByteString as BS
 import Data.Aeson (encode, object, (.=))
 import Data.Text (Text)
-import Lucid (Html)
-import Network.Wai (Application, Request (..), Response, mapResponseHeaders, responseLBS)
-import Network.HTTP.Types.Header (hContentType)
+import qualified Data.Text.Encoding as TE
+import Lucid (Html, renderBS)
+import Network.Wai
+  ( Application
+  , Request (..)
+  , Response
+  , mapResponseHeaders
+  , responseLBS
+  , getRequestBodyChunk
+  , setRequestBodyChunks
+  , pathInfo
+  )
+import Network.HTTP.Types.Header (hContentType, hLocation, hCacheControl)
 import Network.HTTP.Types (status413)
 import Servant
   ( (:<|>) (..)
@@ -32,7 +43,9 @@ import Servant
   , Server
   , ServerError (..)
   , addHeader
+  , err303
   , err404
+  , err422
   , err500
   , err503
   , throwError
@@ -98,7 +111,7 @@ appForStore :: MixtapeStore -> Application
 appForStore = (`appForStoreAt` "static")
 
 appForStoreAt :: MixtapeStore -> FilePath -> Application
-appForStoreAt store directory = bodySizeLimit (1024 * 1024) withSecurityHeaders app
+appForStoreAt store directory = bodySizeLimit (1024 * 1024) withSecurityHeaders (cacheControlMiddleware app)
   where
     app = serve appApi (server store directory)
     csp = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://i.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://www.youtube.com"
@@ -109,6 +122,11 @@ appForStoreAt store directory = bodySizeLimit (1024 * 1024) withSecurityHeaders 
       , ("X-Frame-Options", "SAMEORIGIN")
       ]
     withSecurityHeaders = mapResponseHeaders (securityHeaders ++)
+    cacheControlMiddleware innerApp req sendResp =
+      innerApp req $ \resp ->
+        case pathInfo req of
+          ("assets" : _) -> sendResp (mapResponseHeaders ((hCacheControl, "public, max-age=86400") :) resp)
+          _ -> sendResp resp
 
 bodySizeLimit :: Int -> (Response -> Response) -> Application -> Application
 bodySizeLimit limit secureResponse app request respond
@@ -122,14 +140,14 @@ bodySizeLimit limit secureResponse app request respond
           "Request body too large"
         Just chunks -> do
           bodyRef <- newIORef chunks
-          app (request { requestBody = atomicModifyIORef' bodyRef $ \remaining ->
-            case remaining of
-              [] -> ([], BS.empty)
-              chunk : rest -> (rest, chunk)
-            }) (respond . secureResponse)
+          let getChunk = atomicModifyIORef' bodyRef $ \remaining ->
+                case remaining of
+                  [] -> ([], BS.empty)
+                  chunk : rest -> (rest, chunk)
+          app (setRequestBodyChunks getChunk request) (respond . secureResponse)
   where
     collect size chunks = do
-      chunk <- requestBody request
+      chunk <- getRequestBodyChunk request
       if BS.null chunk
         then pure (Just (reverse chunks))
         else if size + BS.length chunk > limit
@@ -138,7 +156,7 @@ bodySizeLimit limit secureResponse app request respond
 
 server :: MixtapeStore -> FilePath -> Server AppApi
 server store staticDirectory = healthHandler :<|> (createMixtapeHandler store :<|> getMixtapeHandler store) :<|>
-  (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler store) :<|> getSharedMixtapeHandler store)) :<|>
+  (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler store) :<|> (createdPageHandler store :<|> getSharedMixtapeHandler store))) :<|>
   serveDirectoryWebApp staticDirectory
 
 healthHandler :: Handler String
@@ -152,12 +170,34 @@ createPageHandler = pure (renderCreatePage Nothing Nothing)
 
 submitCreateFormHandler :: MixtapeStore -> CreateMixtapeForm -> Handler (Html ())
 submitCreateFormHandler store form = case createMixtapeFromForm form of
-  Left validationError -> pure (renderCreatePage (Just validationError) (Just form))
+  Left validationError -> throwError err422
+    { errBody = renderBS (renderCreatePage (Just validationError) (Just form))
+    , errHeaders = [(hContentType, "text/html; charset=utf-8")]
+    }
   Right mixtape -> do
     result <- liftIO (storeCreateMixtape store mixtape)
     case result of
-      Left _ -> pure (renderCreatePage (Just "We could not save your mixtape. Please try again.") (Just form))
-      Right created -> pure (renderCreatedPage created)
+      Left _ -> throwError err500
+        { errBody = renderBS (renderCreatePage (Just "We could not save your mixtape. Please try again.") (Just form))
+        , errHeaders = [(hContentType, "text/html; charset=utf-8")]
+        }
+      Right created -> do
+        let target = "/created/" <> toUrlPiece (shareCodeFor created.mixtapeId)
+            targetBs = TE.encodeUtf8 target
+        throwError err303
+          { errHeaders =
+              [ (hLocation, targetBs)
+              , ("HX-Redirect", targetBs)
+              ]
+          }
+
+createdPageHandler :: MixtapeStore -> ShareCode -> Handler (Html ())
+createdPageHandler store shareCode = do
+  result <- liftIO (storeGetMixtape store (mixtapeIdFromShareCode shareCode))
+  case result of
+    Left storeError -> throwError (storeErrorResponse storeError)
+    Right Nothing -> throwError err404
+    Right (Just mixtape) -> pure (renderCreatedPage mixtape)
 
 createMixtapeHandler
   :: MixtapeStore

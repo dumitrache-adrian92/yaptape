@@ -137,7 +137,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       statusCode (responseStatus createResponse) `shouldBe` 200
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
       BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js"
-      BL8.unpack (responseBody createResponse) `shouldContain` "Track title (filled from YouTube)"
+      BL8.unpack (responseBody createResponse) `shouldContain` "Track title (e.g. Artist - Song, or filled from YouTube)"
       countOccurrences "data-remove" (BL8.unpack (responseBody createResponse)) `shouldBe` 2
       createScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/create.js")
       createScriptResponse <- httpLbs createScriptRequest manager
@@ -147,6 +147,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       stylesheetResponse <- httpLbs stylesheetRequest manager
       statusCode (responseStatus stylesheetResponse) `shouldBe` 200
       BL8.unpack (responseBody stylesheetResponse) `shouldContain` ".listening-layout"
+      lookup "Cache-Control" (responseHeaders stylesheetResponse) `shouldBe` Just "public, max-age=86400"
       faviconRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/favicon.svg")
       faviconResponse <- httpLbs faviconRequest manager
       statusCode (responseStatus faviconResponse) `shouldBe` 200
@@ -168,7 +169,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
             , requestBody = RequestBodyLBS "title=Kept+form&videoUrls=https%3A%2F%2Fexample.com%2Fwatch%3Fv%3DdQw4w9WgXcQ&notes=Kept+note"
             }
       invalidFormResponse <- httpLbs invalidForm manager
-      statusCode (responseStatus invalidFormResponse) `shouldBe` 200
+      statusCode (responseStatus invalidFormResponse) `shouldBe` 422
       BL8.unpack (responseBody invalidFormResponse) `shouldContain` "Enter a YouTube video link"
       BL8.unpack (responseBody invalidFormResponse) `shouldContain` "Kept form"
       createdResult <- runClientM (postMixtape mixtape) env
@@ -191,6 +192,8 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       BL8.unpack (responseBody pageResponse) `shouldContain` "Start listening"
       BL8.unpack (responseBody pageResponse) `shouldContain` "data-video-id=\"dQw4w9WgXcQ\""
       BL8.unpack (responseBody pageResponse) `shouldContain` "listening-shell"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "og:title"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "og:image"
       playbackScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/playback.js")
       playbackScriptResponse <- httpLbs playbackScriptRequest manager
       statusCode (responseStatus playbackScriptResponse) `shouldBe` 200

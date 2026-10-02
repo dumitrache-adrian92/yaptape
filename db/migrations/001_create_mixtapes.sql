@@ -1,11 +1,11 @@
-CREATE TABLE mixtapes (
+CREATE TABLE IF NOT EXISTS mixtapes (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   title text NOT NULL CHECK (length(trim(title)) > 0),
   description text,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE TABLE tracks (
+CREATE TABLE IF NOT EXISTS tracks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   mixtape_id uuid NOT NULL REFERENCES mixtapes (id) ON DELETE CASCADE,
   track_order integer NOT NULL CHECK (track_order >= 0),

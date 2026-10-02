@@ -34,3 +34,22 @@ Create requests are limited to 1 MiB and 100 tracks. Mixtape titles are limited 
 - `GET /m/{share-code}` renders the listening page.
 
 The browser uses YouTube’s IFrame API and oEmbed service and Google Fonts. htmx 2.0.8 is bundled locally with Subresource Integrity and its license at `static/js/HTMX-LICENSE.txt`. The app emits a Content Security Policy that permits those external services and the YouTube player.
+
+## Browser tests
+
+The Playwright browser tests exercise the create page in Chromium. They cover adding, reordering, and removing tracks, URL feedback, and YouTube title lookup. The oEmbed response is stubbed so the test does not depend on YouTube being available.
+
+Start the database and app using the local setup steps above. In another terminal, install the JavaScript test dependencies and Chromium once:
+
+```sh
+npm install
+npx playwright install chromium
+```
+
+Then run the browser suite:
+
+```sh
+npm run test:e2e
+```
+
+The app must be reachable at `http://127.0.0.1:3000`. Set `YAPTAPE_URL` to use a different local app URL.

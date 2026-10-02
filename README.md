@@ -52,7 +52,7 @@ Run the browser suite with:
 npm run test:e2e
 ```
 
-This starts PostgreSQL, applies the idempotent migrations, starts the app if it is not already healthy, and then runs Playwright. The app process is stopped when the suite finishes; PostgreSQL is left running. Use `PORT` to select the app port.
+This starts PostgreSQL, applies the idempotent migrations, starts a dedicated app process against the test database, and then runs Playwright. The app process is stopped when the suite finishes; PostgreSQL is left running. The browser-test app defaults to port `3001`; set `E2E_PORT` to choose another port. The script fails if an app is already responding on that port.
 
 Run the Haskell unit tests without Docker or PostgreSQL:
 

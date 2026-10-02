@@ -27,6 +27,7 @@ extra-source-files:
 data-files:
     static/css/app.css
     static/favicon.svg
+    static/js/HTMX-LICENSE.txt
     static/js/copy-link.js
     static/js/create.js
     static/js/htmx.min.js

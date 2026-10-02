@@ -21,6 +21,7 @@ data-files:
 - static/css/app.css
 - static/favicon.svg
 - static/js/*.js
+- static/js/HTMX-LICENSE.txt
 
 ghc-options:
 - -Wall

@@ -54,10 +54,16 @@ npm run test:e2e
 
 This starts PostgreSQL, applies the idempotent migrations, starts the app if it is not already healthy, and then runs Playwright. The app process is stopped when the suite finishes; PostgreSQL is left running. Use `PORT` to select the app port.
 
-Run only the Haskell unit tests with:
+Run the Haskell unit tests without Docker or PostgreSQL:
 
 ```sh
 npm run test:unit
 ```
 
-This also starts PostgreSQL and applies the migrations before running the unit-test group. Both commands use the development database credentials from `compose.yaml`; set `POSTGRES_PASSWORD` and `DATABASE_PASSWORD` together if you use a different password.
+Run the PostgreSQL-backed integration tests with:
+
+```sh
+npm run test:integration
+```
+
+The integration and browser test commands start PostgreSQL and apply migrations to the separate `yaptape_test` database. They leave PostgreSQL running. Set `TEST_DATABASE_NAME` to choose another test database. Both commands use the development database credentials from `compose.yaml`; set `POSTGRES_PASSWORD` and `DATABASE_PASSWORD` together if you use a different password. The test database is retained between runs so migrations are checked for repeatability.

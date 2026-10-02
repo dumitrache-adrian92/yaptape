@@ -36,4 +36,15 @@ test('create form manages tracks and looks up valid YouTube titles', async ({ pa
   await trackRows.nth(0).locator('[data-remove]').click();
   await expect(trackRows).toHaveCount(1);
   await expect(trackRows.first().locator('.track-title')).toHaveValue('Never Gonna Give You Up');
+
+  await trackRows.first().locator('.track-note').fill('A song for the long way home');
+  await page.locator('#tape-title').fill('Road trip songs');
+  await page.getByRole('button', { name: 'Create mixtape' }).click();
+
+  await expect(page.getByRole('heading', { name: 'Your mixtape is ready.' })).toBeVisible();
+  await expect(page.locator('#share-link')).toHaveAttribute('value', /^\/m\/[A-Za-z0-9_-]+$/);
+  await page.getByRole('link', { name: 'Preview your mixtape' }).click();
+  await expect(page).toHaveURL(/\/m\/[A-Za-z0-9_-]+$/);
+  await expect(page.getByRole('heading', { name: 'Road trip songs' })).toBeVisible();
+  await expect(page.getByText('A song for the long way home')).toBeVisible();
 });

@@ -116,6 +116,13 @@ document.addEventListener('click',function(event) {
   
 }
 );
+document.body.addEventListener('htmx:beforeSwap',function(evt) {
+  if(evt.detail.xhr&&evt.detail.xhr.status===422) {
+    evt.detail.shouldSwap=true;
+    evt.detail.isError=false
+  }
+}
+);
 document.body.addEventListener('htmx:responseError',function() {
   document.querySelector('#create-flow').insertAdjacentHTML('afterbegin','<p class=error role=alert>We could not save this mixtape. Please try again.</p>')
 }

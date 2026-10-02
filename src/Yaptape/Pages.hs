@@ -62,7 +62,7 @@ trackRow savedValues = div_ [class_ "track-row"] $ do
   div_ [class_ "track-number"] "♪"
   div_ [class_ "track-fields"] $ do
     input_ ([name_ "videoUrls", type_ "url", placeholder_ "YouTube video link", required_ "", class_ "video-url"] <> maybe [] (\(url, _, _) -> [value_ url]) savedValues)
-    input_ ([name_ "titles", type_ "text", placeholder_ "Track title (filled from YouTube)", class_ "track-title", maxlength_ "300"] <> maybe [] (\(_, _, trackTitle) -> [value_ trackTitle]) savedValues)
+    input_ ([name_ "titles", type_ "text", placeholder_ "Track title (e.g. Artist - Song, or filled from YouTube)", class_ "track-title", maxlength_ "300"] <> maybe [] (\(_, _, trackTitle) -> [value_ trackTitle]) savedValues)
     textarea_ [name_ "notes", rows_ "2", placeholder_ "What should they notice while this plays?", required_ "", class_ "track-note"] (maybe mempty (toHtml . (\(_, trackNote, _) -> trackNote)) savedValues)
     p_ [class_ "url-hint", makeAttribute "aria-live" "polite"] "YouTube links from youtube.com or youtu.be"
   div_ [class_ "row-actions"] $ do
@@ -85,8 +85,23 @@ renderCreatedPage mixtape = layout "Your mixtape is ready · Yaptape" $ main_ [c
     a_ [href_ "/create", class_ "text-link secondary-link"] "Make another"
     script_ [src_ "/assets/js/copy-link.js", defer_ ""] (mempty :: Html ())
 
+data PageMeta = PageMeta
+  { metaTitle :: Text
+  , metaDescription :: Maybe Text
+  , metaImage :: Maybe Text
+  , metaOgType :: Maybe Text
+  }
+
+defaultMeta :: Text -> PageMeta
+defaultMeta title = PageMeta
+  { metaTitle = title
+  , metaDescription = Just "Make a mixtape from YouTube tracks, add a note to each track, and share it."
+  , metaImage = Nothing
+  , metaOgType = Just "website"
+  }
+
 renderMixtapePage :: StoredMixtape -> Html ()
-renderMixtapePage mixtape = layout (mixtape.title <> " · Yaptape") $ div_ [class_ "page-shell listening-shell"] $ do
+renderMixtapePage mixtape = layoutWithMeta tapeMeta $ div_ [class_ "page-shell listening-shell"] $ do
   a_ [href_ "/", class_ "wordmark"] "yaptape"
   main_ [class_ "listening-page", id_ "mixtape-player"] $ do
     header_ [class_ "listening-heading"] $ do
@@ -123,13 +138,40 @@ renderMixtapePage mixtape = layout (mixtape.title <> " · Yaptape") $ div_ [clas
         p_ [id_ "current-track-counter", class_ "track-count"] ""
       ol_ [id_ "track-queue", class_ "playback-queue"] (mapM_ (uncurry renderQueueTrack) (zip [0 :: Int ..] mixtape.tracks))
   script_ [src_ "/assets/js/playback.js", defer_ ""] (mempty :: Html ())
+  where
+    firstThumbnail = case mixtape.tracks of
+      (t : _) -> Just ("https://i.ytimg.com/vi/" <> unYouTubeVideoId t.videoId <> "/hqdefault.jpg")
+      [] -> Nothing
+    tapeDesc = case mixtape.description of
+      Just d | not (T.null (T.strip d)) -> Just d
+      _ -> Just ("A mixtape with " <> T.pack (show (length mixtape.tracks)) <> " tracks on Yaptape.")
+    tapeMeta = PageMeta
+      { metaTitle = mixtape.title <> " · Yaptape"
+      , metaDescription = tapeDesc
+      , metaImage = firstThumbnail
+      , metaOgType = Just "music.playlist"
+      }
 
 layout :: Text -> Html () -> Html ()
-layout pageTitle content = doctypehtml_ $ html_ [lang_ "en"] $ do
+layout pageTitle = layoutWithMeta (defaultMeta pageTitle)
+
+layoutWithMeta :: PageMeta -> Html () -> Html ()
+layoutWithMeta pageMeta content = doctypehtml_ $ html_ [lang_ "en"] $ do
   head_ $ do
     meta_ [charset_ "utf-8"]
     meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1"]
-    title_ (toHtml pageTitle)
+    title_ (toHtml pageMeta.metaTitle)
+    maybe mempty (\desc -> meta_ [name_ "description", content_ desc]) pageMeta.metaDescription
+    meta_ [makeAttribute "property" "og:title", content_ pageMeta.metaTitle]
+    maybe mempty (\desc -> meta_ [makeAttribute "property" "og:description", content_ desc]) pageMeta.metaDescription
+    maybe mempty (\ogType -> meta_ [makeAttribute "property" "og:type", content_ ogType]) pageMeta.metaOgType
+    maybe mempty (\img -> do
+      meta_ [makeAttribute "property" "og:image", content_ img]
+      meta_ [name_ "twitter:image", content_ img]
+      ) pageMeta.metaImage
+    meta_ [name_ "twitter:card", content_ (if maybe False (const True) pageMeta.metaImage then "summary_large_image" else "summary")]
+    meta_ [name_ "twitter:title", content_ pageMeta.metaTitle]
+    maybe mempty (\desc -> meta_ [name_ "twitter:description", content_ desc]) pageMeta.metaDescription
     link_ [rel_ "icon", type_ "image/svg+xml", href_ "/assets/favicon.svg"]
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_ [rel_ "preconnect", href_ "https://fonts.gstatic.com", crossorigin_ "anonymous"]

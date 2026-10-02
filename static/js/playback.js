@@ -9,7 +9,11 @@
   function showTrack() {
     const item=queue[current];
     document.querySelector('#current-track-title').textContent=item.dataset.trackTitle;
-    document.querySelector('#current-track-artist').textContent=item.dataset.trackArtist||'';
+    const artistElem=document.querySelector('#current-track-artist');
+    if(artistElem) {
+      artistElem.textContent=item.dataset.trackArtist||'';
+      artistElem.style.display=item.dataset.trackArtist?'':'none'
+    }
     document.querySelector('#current-track-note').textContent=item.dataset.trackNote;
     document.querySelector('#current-track-counter').textContent=(current+1)+' / '+queue.length;
     queue.forEach((row,index)=> {
@@ -39,16 +43,24 @@
   }
   );
   document.querySelector('#next-track').addEventListener('click',()=>selectTrack(current+1));
+  let pendingPlay=false;
   function play() {
     if(ready) {
       player.playVideo();
       startButton.hidden=true;
       announce('Starting playback…')
     }
+    else {
+      pendingPlay=true;
+      announce('Player is loading, starting shortly…')
+    }
     
   }
   function toggle() {
-    if(!ready)return;
+    if(!ready) {
+      pendingPlay=!pendingPlay;
+      return
+    }
     if(player.getPlayerState()===YT.PlayerState.PLAYING) {
       player.pauseVideo()
     }
@@ -56,6 +68,23 @@
   }
   playButton.addEventListener('click',toggle);
   startButton.addEventListener('click',play);
+  document.addEventListener('keydown',function(event) {
+    const tag=(event.target&&event.target.tagName)?event.target.tagName.toLowerCase():'';
+    if(tag==='input'||tag==='textarea'||tag==='select'||(event.target&&event.target.isContentEditable))return;
+    if(event.code==='Space') {
+      event.preventDefault();
+      toggle()
+    }
+    else if(event.code==='ArrowLeft'||event.key==='k') {
+      if(current>0)selectTrack(current-1);
+      else if(ready)player.seekTo(0,true)
+    }
+    else if(event.code==='ArrowRight'||event.key==='j') {
+      if(current<queue.length-1)selectTrack(current+1)
+    }
+    
+  }
+  );
   window.onYouTubeIframeAPIReady=function() {
     player=new YT.Player('youtube-player', {
       width:1280,height:720,videoId:queue[0].dataset.videoId,playerVars: {
@@ -64,9 +93,17 @@
       ,events: {
         onReady:function(event) {
           ready=true;
-          announce('Starting the first track…');
-          if(current===0)event.target.playVideo();
-          else event.target.loadVideoById(queue[current].dataset.videoId)
+          if(pendingPlay) {
+            event.target.playVideo();
+            startButton.hidden=true;
+            announce('Starting playback…')
+          }
+          else {
+            announce('Starting the first track…');
+            if(current===0)event.target.playVideo();
+            else event.target.loadVideoById(queue[current].dataset.videoId)
+          }
+          
         }
         ,onStateChange:function(event) {
           if(event.data===YT.PlayerState.PLAYING) {

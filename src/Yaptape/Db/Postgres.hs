@@ -8,7 +8,6 @@ module Yaptape.Db.Postgres
   , getMixtape
   ) where
 
-import Control.Monad (forM)
 import Data.Functor.Contravariant ((>$<))
 import Data.Int (Int32)
 import Data.Maybe (fromMaybe, mapMaybe)
@@ -28,18 +27,17 @@ import qualified Hasql.Transaction as Transaction
 import qualified Hasql.Transaction.Sessions as Transactions
 import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
+import Yaptape.Db.Schema (MixtapeRow (..), TrackRow (..), fromDbRows)
 import Yaptape.Domain
   ( Mixtape (..)
   , MixtapeId
   , unMixtapeId
   , mkMixtapeId
   , StoredMixtape (..)
-  , StoredTrack (..)
   , Track (..)
-  , TrackId
   , mkTrackId
   )
-import Yaptape.YouTube (mkYouTubeVideoId, unYouTubeVideoId, YouTubeVideoId)
+import Yaptape.YouTube (mkYouTubeVideoId, unYouTubeVideoId, renderYouTubeVideoIdError)
 
 createPool :: IO Pool.Pool
 createPool = do
@@ -70,34 +68,24 @@ createMixtape pool mixtape = Pool.use pool $ Transactions.transaction
   Transactions.ReadCommitted
   Transactions.Write
   (do
-    (rawMixtapeId, createdTime) <- Transaction.statement
+    (mId, createdTime) <- Transaction.statement
       (mixtape.title, mixtape.description)
       insertMixtape
-    storedTracks <- forM (zip [0 :: Int32 ..] mixtape.tracks) $ \(trackOrder, track) -> do
-      rawTrackId <- Transaction.statement
-        (rawMixtapeId, trackOrder, track.videoId, track.title, track.artist, track.note)
-        insertTrack
-      pure StoredTrack
-        { trackId = databaseTrackId rawTrackId
-        , videoId = track.videoId
-        , title = track.title
-        , artist = track.artist
-        , note = track.note
-        }
-    pure StoredMixtape
-      { mixtapeId = databaseMixtapeId rawMixtapeId
-      , title = mixtape.title
-      , description = mixtape.description
-      , createdAt = createdTime
-      , tracks = storedTracks
-      })
-
--- PostgreSQL generates these UUIDs; reject an impossible malformed return value.
-databaseMixtapeId :: Text -> MixtapeId
-databaseMixtapeId raw = maybe (error "PostgreSQL returned an invalid mixtape UUID") id (mkMixtapeId raw)
-
-databaseTrackId :: Text -> TrackId
-databaseTrackId raw = maybe (error "PostgreSQL returned an invalid track UUID") id (mkTrackId raw)
+    let trackOrders = [0 :: Int32 .. fromIntegral (length mixtape.tracks - 1)]
+        videoIds = map (unYouTubeVideoId . (\t -> t.videoId)) mixtape.tracks
+        titles = map (\t -> t.title) mixtape.tracks
+        artists = map (\t -> t.artist) mixtape.tracks
+        notes = map (\t -> t.note) mixtape.tracks
+    trackRows <- Transaction.statement
+      (unMixtapeId mId, trackOrders, videoIds, titles, artists, notes)
+      insertTracksBatch
+    let mRow = MixtapeRow
+          { mixtapeId = mId
+          , title = mixtape.title
+          , description = mixtape.description
+          , createdAt = createdTime
+          }
+    pure (fromDbRows mRow trackRows))
 
 getMixtape :: Pool.Pool -> MixtapeId -> IO (Either Pool.UsageError (Maybe StoredMixtape))
 getMixtape pool mixtapeKey = Pool.use pool $ Transactions.transaction
@@ -107,44 +95,38 @@ getMixtape pool mixtapeKey = Pool.use pool $ Transactions.transaction
     rows <- Transaction.statement (unMixtapeId mixtapeKey) selectMixtapeWithTracks
     pure $ case rows of
       [] -> Nothing
-      (rawMixtapeId, tapeTitle, tapeDescription, createdTime, _, _, _, _, _) : _ ->
-        Just StoredMixtape
-          { mixtapeId = databaseMixtapeId rawMixtapeId
-          , title = tapeTitle
-          , description = tapeDescription
-          , createdAt = createdTime
-          , tracks = mapMaybe toStoredTrack rows
-          })
-  where
-    toStoredTrack (_, _, _, _, Just rawTrackId, Just rawVideoId, trackTitle, performer, Just trackNote) = Just StoredTrack
-      { trackId = databaseTrackId rawTrackId
-      , videoId = databaseVideoId rawVideoId
-      , title = trackTitle
-      , artist = performer
-      , note = trackNote
-      }
-    toStoredTrack _ = Nothing
+      (mRow, firstTrack) : rest ->
+        let trackRows = maybe id (:) firstTrack (mapMaybe snd rest)
+        in Just (fromDbRows mRow trackRows))
 
-selectMixtapeWithTracks :: Statement.Statement Text [(Text, Text, Maybe Text, UTCTime, Maybe Text, Maybe Text, Maybe Text, Maybe Text, Maybe Text)]
+selectMixtapeWithTracks :: Statement.Statement Text [(MixtapeRow, Maybe TrackRow)]
 selectMixtapeWithTracks = Statement.Statement sql encoder decoder True
   where
-    sql = "SELECT m.id::text, m.title, m.description, m.created_at, t.id::text, t.video_id, t.title, t.artist, t.note FROM mixtapes m LEFT JOIN tracks t ON t.mixtape_id = m.id WHERE m.id = $1::uuid ORDER BY t.track_order"
+    sql = "SELECT m.id::text, m.title, m.description, m.created_at, t.id::text, t.mixtape_id::text, t.track_order, t.video_id, t.title, t.artist, t.note FROM mixtapes m LEFT JOIN tracks t ON t.mixtape_id = m.id WHERE m.id = $1::uuid ORDER BY t.track_order"
     encoder = Encoders.param (Encoders.nonNullable Encoders.text)
-    decoder = Decoders.rowList $ (,,,,,,,,)
-      <$> Decoders.column (Decoders.nonNullable Decoders.text)
-      <*> Decoders.column (Decoders.nonNullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nonNullable Decoders.timestamptz)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
-      <*> Decoders.column (Decoders.nullable Decoders.text)
+    decoder = Decoders.rowList $ do
+      mId <- (Decoders.column . Decoders.nonNullable) (Decoders.refine (maybe (Left "invalid mixtape UUID") Right . mkMixtapeId) Decoders.text)
+      mTitle <- Decoders.column (Decoders.nonNullable Decoders.text)
+      mDesc <- Decoders.column (Decoders.nullable Decoders.text)
+      mCreated <- Decoders.column (Decoders.nonNullable Decoders.timestamptz)
+      let mRow = MixtapeRow mId mTitle mDesc mCreated
 
-databaseVideoId :: Text -> YouTubeVideoId
-databaseVideoId raw = either (error . show) id (mkYouTubeVideoId raw)
+      mTrackId <- (Decoders.column . Decoders.nullable) (Decoders.refine (maybe (Left "invalid track UUID") Right . mkTrackId) Decoders.text)
+      mTrackTapeId <- (Decoders.column . Decoders.nullable) (Decoders.refine (maybe (Left "invalid mixtape UUID") Right . mkMixtapeId) Decoders.text)
+      mTrackOrder <- fmap (fmap fromIntegral) (Decoders.column (Decoders.nullable Decoders.int4))
+      mVideoId <- (Decoders.column . Decoders.nullable) (Decoders.refine (either (Left . renderYouTubeVideoIdError) Right . mkYouTubeVideoId) Decoders.text)
+      tTitle <- Decoders.column (Decoders.nullable Decoders.text)
+      tArtist <- Decoders.column (Decoders.nullable Decoders.text)
+      tNote <- Decoders.column (Decoders.nullable Decoders.text)
 
-insertMixtape :: Statement.Statement (Text, Maybe Text) (Text, UTCTime)
+      let mTrackRow = case (mTrackId, mTrackTapeId, mTrackOrder, mVideoId, tNote) of
+            (Just trId, Just trTapeId, Just trOrder, Just trVid, Just trNote) ->
+              Just (TrackRow trId trTapeId trOrder trVid tTitle tArtist trNote)
+            _ -> Nothing
+
+      pure (mRow, mTrackRow)
+
+insertMixtape :: Statement.Statement (Text, Maybe Text) (MixtapeId, UTCTime)
 insertMixtape = Statement.Statement sql encoder decoder True
   where
     sql = "INSERT INTO mixtapes (title, description) VALUES ($1, $2) RETURNING id::text, created_at"
@@ -152,18 +134,34 @@ insertMixtape = Statement.Statement sql encoder decoder True
       (fst >$< Encoders.param (Encoders.nonNullable Encoders.text)) <>
       (snd >$< Encoders.param (Encoders.nullable Encoders.text))
     decoder = Decoders.singleRow $ (,)
-      <$> Decoders.column (Decoders.nonNullable Decoders.text)
+      <$> (Decoders.column . Decoders.nonNullable) (Decoders.refine (maybe (Left "invalid mixtape UUID") Right . mkMixtapeId) Decoders.text)
       <*> Decoders.column (Decoders.nonNullable Decoders.timestamptz)
 
-insertTrack :: Statement.Statement (Text, Int32, YouTubeVideoId, Maybe Text, Maybe Text, Text) Text
-insertTrack = Statement.Statement sql encoder decoder True
+insertTracksBatch :: Statement.Statement (Text, [Int32], [Text], [Maybe Text], [Maybe Text], [Text]) [TrackRow]
+insertTracksBatch = Statement.Statement sql encoder decoder True
   where
-    sql = "INSERT INTO tracks (mixtape_id, track_order, video_id, title, artist, note) VALUES ($1::uuid, $2, $3, $4, $5, $6) RETURNING id::text"
+    sql =
+      "INSERT INTO tracks (mixtape_id, track_order, video_id, title, artist, note) " <>
+      "SELECT $1::uuid, t.track_order, t.video_id, t.title, t.artist, t.note " <>
+      "FROM UNNEST($2::int4[], $3::text[], $4::text[], $5::text[], $6::text[]) " <>
+      "  AS t(track_order, video_id, title, artist, note) " <>
+      "ORDER BY t.track_order " <>
+      "RETURNING id::text, mixtape_id::text, track_order, video_id, title, artist, note"
     encoder =
       ((\(tapeKey, _, _, _, _, _) -> tapeKey) >$< Encoders.param (Encoders.nonNullable Encoders.text)) <>
-      ((\(_, trackOrder, _, _, _, _) -> trackOrder) >$< Encoders.param (Encoders.nonNullable Encoders.int4)) <>
-      ((\(_, _, youtubeId, _, _, _) -> unYouTubeVideoId youtubeId) >$< Encoders.param (Encoders.nonNullable Encoders.text)) <>
-      ((\(_, _, _, trackTitle, _, _) -> trackTitle) >$< Encoders.param (Encoders.nullable Encoders.text)) <>
-      ((\(_, _, _, _, performer, _) -> performer) >$< Encoders.param (Encoders.nullable Encoders.text)) <>
-      ((\(_, _, _, _, _, trackNote) -> trackNote) >$< Encoders.param (Encoders.nonNullable Encoders.text))
-    decoder = Decoders.singleRow $ Decoders.column (Decoders.nonNullable Decoders.text)
+      ((\(_, trackOrders, _, _, _, _) -> trackOrders) >$< Encoders.param (Encoders.nonNullable (Encoders.foldableArray (Encoders.nonNullable Encoders.int4)))) <>
+      ((\(_, _, videoIds, _, _, _) -> videoIds) >$< Encoders.param (Encoders.nonNullable (Encoders.foldableArray (Encoders.nonNullable Encoders.text)))) <>
+      ((\(_, _, _, trackTitles, _, _) -> trackTitles) >$< Encoders.param (Encoders.nonNullable (Encoders.foldableArray (Encoders.nullable Encoders.text)))) <>
+      ((\(_, _, _, _, performers, _) -> performers) >$< Encoders.param (Encoders.nonNullable (Encoders.foldableArray (Encoders.nullable Encoders.text)))) <>
+      ((\(_, _, _, _, _, trackNotes) -> trackNotes) >$< Encoders.param (Encoders.nonNullable (Encoders.foldableArray (Encoders.nonNullable Encoders.text))))
+    decoder = Decoders.rowList trackRowDecoder
+
+trackRowDecoder :: Decoders.Row TrackRow
+trackRowDecoder = TrackRow
+  <$> (Decoders.column . Decoders.nonNullable) (Decoders.refine (maybe (Left "invalid track UUID") Right . mkTrackId) Decoders.text)
+  <*> (Decoders.column . Decoders.nonNullable) (Decoders.refine (maybe (Left "invalid mixtape UUID") Right . mkMixtapeId) Decoders.text)
+  <*> (fmap fromIntegral (Decoders.column (Decoders.nonNullable Decoders.int4)))
+  <*> (Decoders.column . Decoders.nonNullable) (Decoders.refine (either (Left . renderYouTubeVideoIdError) Right . mkYouTubeVideoId) Decoders.text)
+  <*> Decoders.column (Decoders.nullable Decoders.text)
+  <*> Decoders.column (Decoders.nullable Decoders.text)
+  <*> Decoders.column (Decoders.nonNullable Decoders.text)

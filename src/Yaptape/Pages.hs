@@ -20,9 +20,10 @@ import Yaptape.YouTube (unYouTubeVideoId)
 
 renderLandingPage :: Html ()
 renderLandingPage = layout "Yaptape" $ main_ [class_ "landing"] $ do
-  p_ [class_ "eyebrow"] "SIDE A · A LITTLE MORE TO THE MUSIC"
+  p_ [class_ "eyebrow"] "A LITTLE MORE TO THE MUSIC"
   h1_ "Make a mixtape that says a little more."
-  p_ [class_ "intro"] "Bring together the songs you love, add a note to each one, and send someone a tape they can listen through."
+  p_ [class_ "intro"] "Bring together the songs you love, annotate each one, and send someone a tape they can listen through."
+  p_ [class_ "intro"] "Use Yaptape to introduce someone to a new genre, confess your love, reminisce through music or tell a story separated by tracks."
   a_ [href_ "/create", class_ "button"] "Make a mixtape"
   div_ [class_ "tape-art", makeAttribute "aria-hidden" "true"] $ do
     div_ [class_ "reel reel-one"] mempty

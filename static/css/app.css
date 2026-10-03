@@ -311,13 +311,13 @@ h2 {
     transform:translateY(0) rotate(0);
     opacity:1
   }
-  
+
 }
 @keyframes reel-spin {
   to {
     transform:rotate(360deg)
   }
-  
+
 }
 @media(prefers-reduced-motion:reduce) {
   .cassette {
@@ -326,7 +326,7 @@ h2 {
   .player-deck[data-playing=true] .cassette-reel {
     animation:none
   }
-  
+
 }
 @media(max-width:720px) {
   .listening-layout {
@@ -347,7 +347,7 @@ h2 {
   .queue-heading {
     align-items:center
   }
-  
+
 }
 input,textarea {
   width:100%;
@@ -524,5 +524,5 @@ textarea {
     grid-template-columns:25px 1fr auto;
     gap:6px
   }
-  
+
 }

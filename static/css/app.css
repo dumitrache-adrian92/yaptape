@@ -22,6 +22,24 @@ body {
   justify-content:center;
   position:relative
 }
+.github-link {
+  position:absolute;
+  bottom:24px;
+  left:50%;
+  transform:translateX(-50%);
+  margin:0;
+  padding:0;
+  text-align:center;
+  white-space:nowrap;
+  z-index:1
+}
+.github-link a {
+  color:#356f9f;
+  text-decoration:none
+}
+.github-link a:hover {
+  text-decoration:underline
+}
 .wordmark {
   display:inline-block;
   margin-bottom:48px;
@@ -507,6 +525,12 @@ textarea {
   line-height:1.6
 }
 @media(max-width:600px) {
+  .github-link {
+    position:static;
+    transform:none;
+    margin:36px auto 0;
+    white-space:normal
+  }
   .tape-art {
     position:relative;
     right:auto;

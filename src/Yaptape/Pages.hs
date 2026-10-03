@@ -28,6 +28,7 @@ renderLandingPage = layout "Yaptape" $ main_ [class_ "landing"] $ do
   div_ [class_ "tape-art", makeAttribute "aria-hidden" "true"] $ do
     div_ [class_ "reel reel-one"] mempty
     div_ [class_ "reel reel-two"] mempty
+  footer_ [class_ "github-link"] $ a_ [href_ "https://github.com/dumitrache-adrian92/yaptape/tree/main"] "This site is open source, check it out!"
 
 renderCreatePage :: Maybe Text -> Maybe CreateMixtapeForm -> Html ()
 renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" $ main_ [class_ "page-shell"] $ do
@@ -177,7 +178,7 @@ layoutWithMeta pageMeta content = doctypehtml_ $ html_ [lang_ "en"] $ do
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_ [rel_ "preconnect", href_ "https://fonts.gstatic.com", crossorigin_ "anonymous"]
     link_ [rel_ "stylesheet", href_ "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap"]
-    link_ [rel_ "stylesheet", href_ "/assets/css/app.css"]
+    link_ [rel_ "stylesheet", href_ "/assets/css/app.css?v=3"]
   body_ content
 
 renderQueueTrack :: Int -> StoredTrack -> Html ()

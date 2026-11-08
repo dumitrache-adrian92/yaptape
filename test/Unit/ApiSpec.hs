@@ -47,6 +47,7 @@ import Servant.API (ToHttpApiData (toUrlPiece))
 import Servant.API (FromHttpApiData (parseUrlPiece))
 import Yaptape.Server (MixtapeStore (..), StoreError (..), appForStore)
 import Yaptape.Form (CreateMixtapeForm (..), createMixtapeFromForm)
+import Yaptape.Pages (assetVersion, computeAssetVersion)
 import Yaptape.YouTube (mkYouTubeVideoId)
 import Web.FormUrlEncoded (urlDecodeAsForm)
 
@@ -132,6 +133,14 @@ spec = describe "Mixtape routes with an in-memory store" $ do
           map (\track -> track.title) mixtape.tracks `shouldBe` [Just "First title", Just "Second title"]
           map (\track -> track.artist) mixtape.tracks `shouldBe` [Just "First artist", Nothing]
 
+    it "computes a deterministic content hash for static assets" $ do
+      hash1 <- computeAssetVersion "static"
+      hash2 <- computeAssetVersion "static"
+      missingHash <- computeAssetVersion "nonexistent-static-dir"
+      hash1 `shouldBe` hash2
+      hash1 `shouldBe` assetVersion
+      hash1 `shouldNotBe` missingHash
+
   it "handles POST /api/mixtapes without PostgreSQL" $ do
     let video = requiredEither (mkYouTubeVideoId "dQw4w9WgXcQ")
         track = requiredEither (mkTrack video Nothing Nothing "A note")
@@ -185,7 +194,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       createResponse <- httpLbs createRequest manager
       statusCode (responseStatus createResponse) `shouldBe` 200
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
-      BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js?v=3"
+      BL8.unpack (responseBody createResponse) `shouldContain` ("/assets/js/create.js?v=" <> T.unpack assetVersion)
       BL8.unpack (responseBody createResponse) `shouldContain` "Track title (e.g. Artist - Song, or filled from YouTube)"
       BL8.unpack (responseBody createResponse) `shouldContain` "Artist (optional)"
       countOccurrences "data-remove" (BL8.unpack (responseBody createResponse)) `shouldBe` 2

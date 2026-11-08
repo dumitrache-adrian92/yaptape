@@ -5,6 +5,7 @@ module Yaptape.Pages.Layout
   ( PageMeta (..)
   , defaultMeta
   , assetVersion
+  , computeAssetVersion
   , versionedAsset
   , layout
   , layoutWithMeta
@@ -12,12 +13,46 @@ module Yaptape.Pages.Layout
   , renderErrorPage
   ) where
 
+import Control.Exception (IOException, try)
+import Data.Bits (xor)
+import qualified Data.ByteString as BS
 import Data.Text (Text)
+import qualified Data.Text as T
+import Data.Word (Word64)
 import Lucid
 import Lucid.Base (makeAttribute)
+import Numeric (showHex)
+import System.FilePath ((</>))
+import System.IO.Unsafe (unsafePerformIO)
 
+trackedAssets :: [FilePath]
+trackedAssets =
+  [ "css/app.css"
+  , "js/copy-link.js"
+  , "js/create.js"
+  , "js/playback.js"
+  ]
+
+-- | Compute a deterministic 64-bit FNV-1a hex digest over the static asset files in a directory.
+computeAssetVersion :: FilePath -> IO Text
+computeAssetVersion staticDir = do
+  chunks <- traverse readAsset trackedAssets
+  let digest = BS.foldl' (\acc b -> fnv1aStep acc (fromIntegral b)) fnvOffsetBasis (BS.concat chunks)
+  pure (T.pack (showHex digest ""))
+  where
+    readAsset relPath = do
+      res <- try (BS.readFile (staticDir </> relPath)) :: IO (Either IOException BS.ByteString)
+      pure (either (const BS.empty) id res)
+    fnvOffsetBasis :: Word64
+    fnvOffsetBasis = 0xcbf29ce484222325
+    fnvPrime :: Word64
+    fnvPrime = 0x100000001b3
+    fnv1aStep :: Word64 -> Word64 -> Word64
+    fnv1aStep acc byte = (acc `xor` byte) * fnvPrime
+
+{-# NOINLINE assetVersion #-}
 assetVersion :: Text
-assetVersion = "3"
+assetVersion = unsafePerformIO (computeAssetVersion "static")
 
 versionedAsset :: Text -> Text
 versionedAsset path = path <> "?v=" <> assetVersion

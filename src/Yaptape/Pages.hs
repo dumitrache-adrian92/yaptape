@@ -1,5 +1,7 @@
 module Yaptape.Pages
-  ( renderLandingPage
+  ( assetVersion
+  , computeAssetVersion
+  , renderLandingPage
   , renderCreatePage
   , renderCreatedPage
   , renderMixtapePage
@@ -7,5 +9,5 @@ module Yaptape.Pages
   ) where
 
 import Yaptape.Pages.Create (renderCreatePage, renderCreatedPage)
-import Yaptape.Pages.Layout (renderErrorPage, renderLandingPage)
+import Yaptape.Pages.Layout (assetVersion, computeAssetVersion, renderErrorPage, renderLandingPage)
 import Yaptape.Pages.Player (renderMixtapePage)

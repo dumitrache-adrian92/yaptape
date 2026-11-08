@@ -26,7 +26,6 @@ import Lucid (Html, renderBS)
 import Network.Wai
   ( Application
   , Request (..)
-  , Response
   , mapResponseHeaders
   , responseLBS
   , getRequestBodyChunk
@@ -111,7 +110,8 @@ appForStore :: MixtapeStore -> Application
 appForStore = (`appForStoreAt` "static")
 
 appForStoreAt :: MixtapeStore -> FilePath -> Application
-appForStoreAt store directory = bodySizeLimit (1024 * 1024) withSecurityHeaders (cacheControlMiddleware app)
+appForStoreAt store directory =
+  securityHeadersMiddleware (bodySizeLimit (1024 * 1024) (cacheControlMiddleware app))
   where
     app = serve appApi (server store directory)
     csp = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://i.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://www.youtube.com"
@@ -122,19 +122,21 @@ appForStoreAt store directory = bodySizeLimit (1024 * 1024) withSecurityHeaders 
       , ("X-Frame-Options", "SAMEORIGIN")
       ]
     withSecurityHeaders = mapResponseHeaders (securityHeaders ++)
+    securityHeadersMiddleware innerApp req sendResp =
+      innerApp req (sendResp . withSecurityHeaders)
     cacheControlMiddleware innerApp req sendResp =
       innerApp req $ \resp ->
         case pathInfo req of
           ("assets" : _) -> sendResp (mapResponseHeaders ((hCacheControl, "public, max-age=86400") :) resp)
           _ -> sendResp resp
 
-bodySizeLimit :: Int -> (Response -> Response) -> Application -> Application
-bodySizeLimit limit secureResponse app request respond
+bodySizeLimit :: Int -> Application -> Application
+bodySizeLimit limit app request respond
   | requestMethod request `notElem` ["POST", "PUT", "PATCH"] = app request respond
   | otherwise = do
       body <- collect 0 []
       case body of
-        Nothing -> respond $ secureResponse $ responseLBS
+        Nothing -> respond $ responseLBS
           status413
           [(hContentType, "text/plain; charset=utf-8")]
           "Request body too large"
@@ -144,7 +146,7 @@ bodySizeLimit limit secureResponse app request respond
                 case remaining of
                   [] -> ([], BS.empty)
                   chunk : rest -> (rest, chunk)
-          app (setRequestBodyChunks getChunk request) (respond . secureResponse)
+          app (setRequestBodyChunks getChunk request) respond
   where
     collect size chunks = do
       chunk <- getRequestBodyChunk request

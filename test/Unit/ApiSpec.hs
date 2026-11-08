@@ -137,6 +137,11 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       landingRequest <- parseRequest ("http://localhost:" <> show port <> "/")
       landingResponse <- httpLbs landingRequest manager
       statusCode (responseStatus landingResponse) `shouldBe` 200
+      let landingHeaders = responseHeaders landingResponse
+      lookup "Content-Security-Policy" landingHeaders `shouldSatisfy` maybe False (const True)
+      lookup "X-Content-Type-Options" landingHeaders `shouldBe` Just "nosniff"
+      lookup "Referrer-Policy" landingHeaders `shouldBe` Just "strict-origin-when-cross-origin"
+      lookup "X-Frame-Options" landingHeaders `shouldBe` Just "SAMEORIGIN"
       BL8.unpack (responseBody landingResponse) `shouldContain` "Make a mixtape that says a little more"
       BL8.unpack (responseBody landingResponse) `shouldContain` "/assets/favicon.svg"
       oversizedRequestBase <- parseRequest ("http://localhost:" <> show port <> "/create")

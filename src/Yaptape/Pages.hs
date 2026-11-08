@@ -9,6 +9,7 @@ module Yaptape.Pages
   , renderErrorPage
   ) where
 
+import Data.List (zip4)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -19,6 +20,7 @@ import Yaptape.Domain
   , StoredTrack (..)
   , maxMixtapeDescriptionLength
   , maxMixtapeTitleLength
+  , maxTrackArtistLength
   , maxTrackNoteLength
   , maxTrackTitleLength
   , shareCodeFor
@@ -68,19 +70,20 @@ renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" 
   script_ [src_ "/assets/js/htmx.min.js", defer_ "", makeAttribute "integrity" "sha256-Iig+9oy3VFkU8KiKG97cclanA9HVgMHSVSF9ClDTExM=", makeAttribute "crossorigin" "anonymous"] (mempty :: Html ())
   script_ [src_ (versionedAsset "/assets/js/create.js"), defer_ ""] (mempty :: Html ())
 
-formRows :: Maybe CreateMixtapeForm -> [Maybe (Text, Text, Text)]
+formRows :: Maybe CreateMixtapeForm -> [Maybe (Text, Text, Text, Text)]
 formRows Nothing = [Nothing]
-formRows (Just form) = case zip3 form.formVideoUrls form.formNotes (form.formTitles <> repeat "") of
+formRows (Just form) = case zip4 form.formVideoUrls form.formNotes (form.formTitles <> repeat "") (form.formArtists <> repeat "") of
   [] -> [Nothing]
   entries -> map Just entries
 
-trackRow :: Maybe (Text, Text, Text) -> Html ()
+trackRow :: Maybe (Text, Text, Text, Text) -> Html ()
 trackRow savedValues = div_ [class_ "track-row"] $ do
   div_ [class_ "track-number"] "♪"
   div_ [class_ "track-fields"] $ do
-    input_ ([name_ "videoUrls", type_ "url", placeholder_ "YouTube video link", required_ "", class_ "video-url"] <> maybe [] (\(url, _, _) -> [value_ url]) savedValues)
-    input_ ([name_ "titles", type_ "text", placeholder_ "Track title (e.g. Artist - Song, or filled from YouTube)", class_ "track-title", maxlength_ (T.pack (show maxTrackTitleLength))] <> maybe [] (\(_, _, trackTitle) -> [value_ trackTitle]) savedValues)
-    textarea_ [name_ "notes", rows_ "2", placeholder_ "What should they notice while this plays?", required_ "", class_ "track-note", maxlength_ (T.pack (show maxTrackNoteLength))] (maybe mempty (toHtml . (\(_, trackNote, _) -> trackNote)) savedValues)
+    input_ ([name_ "videoUrls", type_ "url", placeholder_ "YouTube video link", required_ "", class_ "video-url"] <> maybe [] (\(url, _, _, _) -> [value_ url]) savedValues)
+    input_ ([name_ "titles", type_ "text", placeholder_ "Track title (e.g. Artist - Song, or filled from YouTube)", class_ "track-title", maxlength_ (T.pack (show maxTrackTitleLength))] <> maybe [] (\(_, _, trackTitle, _) -> [value_ trackTitle]) savedValues)
+    input_ ([name_ "artists", type_ "text", placeholder_ "Artist (optional)", class_ "track-artist", maxlength_ (T.pack (show maxTrackArtistLength))] <> maybe [] (\(_, _, _, trackArtist) -> [value_ trackArtist]) savedValues)
+    textarea_ [name_ "notes", rows_ "2", placeholder_ "What should they notice while this plays?", required_ "", class_ "track-note", maxlength_ (T.pack (show maxTrackNoteLength))] (maybe mempty (toHtml . (\(_, trackNote, _, _) -> trackNote)) savedValues)
     p_ [class_ "url-hint", makeAttribute "aria-live" "polite"] "YouTube links from youtube.com or youtu.be"
   div_ [class_ "row-actions"] $ do
     button_ [type_ "button", makeAttribute "data-move" "up", class_ "icon-button", title_ "Move track up"] "↑"

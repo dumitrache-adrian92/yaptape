@@ -110,22 +110,27 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       mkMixtape "Tape" (Just (T.replicate 501 "a")) [validTrack] `shouldSatisfy` either (const True) (const False)
       mkMixtape "Tape" Nothing ( replicate 101 validTrack ) `shouldSatisfy` either (const True) (const False)
 
-    it "uses the title looked up from YouTube as the track title" $ do
+    it "uses the title and artist from the form as the track metadata" $ do
       let form = CreateMixtapeForm "Tape" Nothing
             ["https://www.youtube.com/watch?v=dQw4w9WgXcQ"]
             ["Never Gonna Give You Up"]
+            ["Rick Astley"]
             ["A note"]
       case createMixtapeFromForm form of
         Left err -> expectationFailure (T.unpack err)
         Right mixtape -> case mixtape.tracks of
-          [track] | Just trackTitle <- track.title -> trackTitle `shouldBe` "Never Gonna Give You Up"
-          _ -> expectationFailure "Expected the YouTube title to be the track title"
+          [track] -> do
+            track.title `shouldBe` Just "Never Gonna Give You Up"
+            track.artist `shouldBe` Just "Rick Astley"
+          _ -> expectationFailure "Expected one parsed track"
 
-    it "keeps titles aligned with repeated video and note form fields" $ do
-      let payload = BL8.pack "title=Tape&videoUrls=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&videoUrls=https%3A%2F%2Fyoutu.be%2FM7lc1UVf-VE&titles=First+title&titles=Second+title&notes=First+note&notes=Second+note"
+    it "keeps titles and artists aligned with repeated video and note form fields" $ do
+      let payload = BL8.pack "title=Tape&videoUrls=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&videoUrls=https%3A%2F%2Fyoutu.be%2FM7lc1UVf-VE&titles=First+title&titles=Second+title&artists=First+artist&artists=&notes=First+note&notes=Second+note"
       case (urlDecodeAsForm payload :: Either Text CreateMixtapeForm) >>= createMixtapeFromForm of
         Left err -> expectationFailure (T.unpack err)
-        Right mixtape -> map (\track -> track.title) mixtape.tracks `shouldBe` [Just "First title", Just "Second title"]
+        Right mixtape -> do
+          map (\track -> track.title) mixtape.tracks `shouldBe` [Just "First title", Just "Second title"]
+          map (\track -> track.artist) mixtape.tracks `shouldBe` [Just "First artist", Nothing]
 
   it "handles POST /api/mixtapes without PostgreSQL" $ do
     let video = requiredEither (mkYouTubeVideoId "dQw4w9WgXcQ")
@@ -182,6 +187,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
       BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js?v=3"
       BL8.unpack (responseBody createResponse) `shouldContain` "Track title (e.g. Artist - Song, or filled from YouTube)"
+      BL8.unpack (responseBody createResponse) `shouldContain` "Artist (optional)"
       countOccurrences "data-remove" (BL8.unpack (responseBody createResponse)) `shouldBe` 2
       createScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/create.js")
       createScriptResponse <- httpLbs createScriptRequest manager

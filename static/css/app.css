@@ -384,7 +384,7 @@ input:focus,textarea:focus {
 textarea {
   resize:vertical
 }
-.track-fields .track-title,.track-fields textarea {
+.track-fields .track-title,.track-fields .track-artist,.track-fields textarea {
   margin-top:9px
 }
 .button {

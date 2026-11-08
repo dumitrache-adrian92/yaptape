@@ -23,7 +23,9 @@ import Servant.Client
   , mkClientEnv
   , runClientM
   )
+import Data.UUID (fromWords64)
 import Test.Hspec
+import Test.Hspec.QuickCheck (prop)
 import Servant.API (Header, Headers, getHeaders, getResponse)
 import Yaptape.Api (getMixtapeApi, mixtapeApi)
 import Yaptape.Domain
@@ -33,6 +35,8 @@ import Yaptape.Domain
   , StoredTrack (..)
   , ShareCode
   , Track (title, artist, note)
+  , mixtapeIdFromShareCode
+  , mixtapeIdFromUUID
   , mkMixtape
   , mkMixtapeId
   , mkTrack
@@ -65,6 +69,21 @@ spec = describe "Mixtape routes with an in-memory store" $ do
           encoded = toUrlPiece code
       T.length encoded `shouldBe` 22
       (parseUrlPiece encoded :: Either Text ShareCode) `shouldBe` Right code
+
+    prop "round trips arbitrary UUIDs through ShareCode URL pieces" $ \(w1, w2) ->
+      let mId = mixtapeIdFromUUID (fromWords64 w1 w2)
+          code = shareCodeFor mId
+          encoded = toUrlPiece code
+      in T.length encoded == 22
+         && (parseUrlPiece encoded :: Either Text ShareCode) == Right code
+         && fmap mixtapeIdFromShareCode (parseUrlPiece encoded) == Right mId
+
+    it "rejects 22-character ShareCode strings with non-canonical trailing bits" $ do
+      let mixtapeKey = requiredMaybe (mkMixtapeId "00000000-0000-4000-8000-000000000000")
+          canonical = toUrlPiece (shareCodeFor mixtapeKey)
+          nonCanonical = T.init canonical <> "B"
+      T.length nonCanonical `shouldBe` 22
+      (parseUrlPiece nonCanonical :: Either Text ShareCode) `shouldSatisfy` either (const True) (const False)
 
     it "rejects blank titles, blank notes, and tapes without tracks" $ do
       let blankTitle = decode "{\"title\":\"  \",\"tracks\":[{\"videoId\":\"dQw4w9WgXcQ\",\"note\":\"n\"}]}" :: Maybe Mixtape

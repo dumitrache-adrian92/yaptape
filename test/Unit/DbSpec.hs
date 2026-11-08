@@ -4,9 +4,12 @@
 
 module Unit.DbSpec (spec) where
 
+import qualified Data.List as List
 import Data.Time (UTCTime (..), fromGregorian)
 import Data.Text (Text)
 import Test.Hspec
+import Test.Hspec.QuickCheck (prop)
+import Test.QuickCheck (forAll, shuffle, sublistOf)
 
 import Yaptape.Db
   ( MixtapeRow (..)
@@ -23,7 +26,9 @@ import Yaptape.Domain
   , Track
   , mkTrack
   , mkTrackId
+  , trackIdFromUUID
   )
+import Data.UUID (fromWords)
 import Yaptape.YouTube (mkYouTubeVideoId)
 
 spec :: Spec
@@ -74,6 +79,24 @@ spec = describe "Yaptape.Db" $ do
       -- Pass in reverse order to ensure it sorts by trackOrder
       let reconstructed = fromDbRows mRow [r2, r1]
       reconstructed `shouldBe` serverMixtape
+
+    prop "always reconstructs tracks sorted by ascending trackOrder regardless of row permutation" $
+      let candidateOrders = [-5 .. 25]
+          mkRow idx = TrackRow
+            { trackId = trackIdFromUUID (fromWords 0 0 0 (fromIntegral (idx + 100)))
+            , mixtapeId = mId
+            , trackOrder = idx
+            , videoId = vid1
+            , title = Nothing
+            , artist = Nothing
+            , note = "Note"
+            }
+          mRow = MixtapeRow mId "My Tape" Nothing time
+      in forAll (sublistOf candidateOrders >>= shuffle) $ \orders ->
+           let rows = map mkRow orders
+               expectedIds = map (\o -> (mkRow o).trackId) (List.sort orders)
+               actualIds = map (\t -> t.trackId) (fromDbRows mRow rows).tracks
+           in actualIds == expectedIds
 
   describe "toTrackBatchParams" $ do
     it "extracts columnar arrays with 0-indexed track orders and UUID mixtapeId" $ do

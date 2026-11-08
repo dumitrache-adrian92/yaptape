@@ -63,6 +63,7 @@ tests:
     - -with-rtsopts=-N
     dependencies:
       - hspec
+      - QuickCheck
       - yaptape
       - servant-client
       - warp >= 3.2.4
@@ -72,6 +73,7 @@ tests:
       - time
       - process
       - hasql
+      - uuid
 
 dependencies:
 - base

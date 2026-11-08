@@ -3,7 +3,10 @@
 module Unit.YouTubeSpec (spec) where
 
 import Data.Aeson (decode)
+import qualified Data.Text as T
 import Test.Hspec
+import Test.Hspec.QuickCheck (prop)
+import Test.QuickCheck (elements, forAll, listOf, vectorOf, (==>))
 import Yaptape.Domain (Track)
 import Yaptape.YouTube
   ( YouTubeVideoId
@@ -49,6 +52,19 @@ spec = describe "Yaptape.YouTube" $ do
 
     it "fails on non-ASCII unicode characters" $ do
       mkYouTubeVideoId "dQw4w9αgXcQ" `shouldBe` Left (InvalidCharacters "α")
+
+    prop "accepts arbitrary 11-character base64url strings" $
+      let base64UrlChar = elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ['_', '-'])
+      in forAll (vectorOf 11 base64UrlChar) $ \chars ->
+           let candidate = T.pack chars
+           in fmap unYouTubeVideoId (mkYouTubeVideoId ("  " <> candidate <> " ")) == Right candidate
+
+    prop "rejects base64url strings whose length is not 11" $
+      let base64UrlChar = elements (['a'..'z'] ++ ['A'..'Z'] ++ ['0'..'9'] ++ ['_', '-'])
+      in forAll (listOf base64UrlChar) $ \chars ->
+           let len = length chars
+           in (len > 0 && len /= 11) ==>
+                mkYouTubeVideoId (T.pack chars) == Left (InvalidLength len)
 
   describe "Aeson JSON parsing for YouTubeVideoId" $ do
     it "decodes valid JSON string" $ do

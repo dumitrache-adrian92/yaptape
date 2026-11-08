@@ -35,7 +35,7 @@ import Data.Aeson (ToJSON (..), encode, object, (.=))
 import Data.Text (Text)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
-import Data.Time (UTCTime, getCurrentTime)
+import Data.Time (UTCTime, diffUTCTime, getCurrentTime)
 import Lucid (Html, renderBS)
 import Network.Wai
   ( Application
@@ -202,16 +202,19 @@ appForStoreWithLogger logger store directory =
           _ -> sendResp resp
 
 requestLoggerMiddleware :: Logger -> Application -> Application
-requestLoggerMiddleware logger innerApp req sendResp =
+requestLoggerMiddleware logger innerApp req sendResp = do
+  start <- getCurrentTime
   innerApp req $ \resp -> do
+    now <- getCurrentTime
     let code = statusCode (responseStatus resp)
+        durationMs = round (diffUTCTime now start * 1000) :: Int
         level
           | code >= 500 = LogError
           | code >= 400 = LogWarn
           | otherwise   = LogInfo
         methodText = TE.decodeUtf8Lenient (requestMethod req)
         pathText = TE.decodeUtf8Lenient (rawPathInfo req)
-    emitLog logger level "http_request" (methodText <> " " <> pathText <> " " <> T.pack (show code))
+    emitLog logger level "http_request" (methodText <> " " <> pathText <> " " <> T.pack (show code) <> " (" <> T.pack (show durationMs) <> "ms)")
     sendResp resp
 
 bodySizeLimit :: Int -> Application -> Application

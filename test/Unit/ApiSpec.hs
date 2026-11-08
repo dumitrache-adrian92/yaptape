@@ -344,11 +344,12 @@ spec = describe "Mixtape routes with an in-memory store" $ do
         [e1, e2] -> do
           e1.logLevel `shouldBe` LogInfo
           e1.logEvent `shouldBe` "http_request"
-          T.unpack e1.logMessage `shouldContain` "GET /health 200"
+          T.unpack e1.logMessage `shouldContain` "GET /health 200 ("
+          T.unpack e1.logMessage `shouldContain` "ms)"
 
           e2.logLevel `shouldBe` LogError
           e2.logEvent `shouldBe` "http_request"
-          T.unpack e2.logMessage `shouldContain` "500"
+          T.unpack e2.logMessage `shouldContain` "500 ("
         other -> expectationFailure ("Expected 2 structured log entries, got: " ++ show other)
 
 requiredMaybe :: Maybe a -> a

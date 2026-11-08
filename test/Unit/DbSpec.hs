@@ -20,7 +20,8 @@ import Yaptape.Domain
   , mixtapeIdToUUID
   , StoredMixtape (..)
   , StoredTrack (..)
-  , Track (..)
+  , Track
+  , mkTrack
   , mkTrackId
   )
 import Yaptape.YouTube (mkYouTubeVideoId)
@@ -32,8 +33,8 @@ spec = describe "Yaptape.Db" $ do
       vid1 = either (error . show) id (mkYouTubeVideoId "dQw4w9WgXcQ")
       vid2 = either (error . show) id (mkYouTubeVideoId "_rVvjslF6M8")
 
-      domainTrack1 = Track vid1 (Just "Track 1") (Just "Artist 1") "Note 1"
-      domainTrack2 = Track vid2 Nothing Nothing "Note 2"
+      domainTrack1 = requiredTrack (mkTrack vid1 (Just "Track 1") (Just "Artist 1") "Note 1")
+      domainTrack2 = requiredTrack (mkTrack vid2 Nothing Nothing "Note 2")
 
       trackId1 = requiredId mkTrackId "00000000-0000-4000-8000-000000000002"
       trackId2 = requiredId mkTrackId "00000000-0000-4000-8000-000000000003"
@@ -88,3 +89,6 @@ spec = describe "Yaptape.Db" $ do
 
 requiredId :: (Text -> Maybe a) -> Text -> a
 requiredId make raw = maybe (error "invalid UUID fixture") id (make raw)
+
+requiredTrack :: Either Text Track -> Track
+requiredTrack = either (error . show) id

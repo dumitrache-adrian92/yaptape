@@ -28,7 +28,7 @@ import Yaptape.Domain
   ( MixtapeId
   , StoredMixtape (..)
   , StoredTrack (..)
-  , Track (..)
+  , Track (videoId, title, artist, note)
   , TrackId
   , mixtapeIdToUUID
   )

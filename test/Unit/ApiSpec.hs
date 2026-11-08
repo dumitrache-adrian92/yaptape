@@ -27,12 +27,12 @@ import Test.Hspec
 import Servant.API (Header, Headers, getHeaders, getResponse)
 import Yaptape.Api (getMixtapeApi, mixtapeApi)
 import Yaptape.Domain
-  ( Mixtape (..)
+  ( Mixtape (title, description, tracks)
   , MixtapeId
   , StoredMixtape (..)
   , StoredTrack (..)
   , ShareCode
-  , Track (..)
+  , Track (title, artist, note)
   , mkMixtape
   , mkMixtapeId
   , mkTrack
@@ -99,18 +99,19 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       case createMixtapeFromForm form of
         Left err -> expectationFailure (T.unpack err)
         Right mixtape -> case mixtape.tracks of
-          [Track _ (Just trackTitle) _ _] -> trackTitle `shouldBe` "Never Gonna Give You Up"
+          [track] | Just trackTitle <- track.title -> trackTitle `shouldBe` "Never Gonna Give You Up"
           _ -> expectationFailure "Expected the YouTube title to be the track title"
 
     it "keeps titles aligned with repeated video and note form fields" $ do
       let payload = BL8.pack "title=Tape&videoUrls=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&videoUrls=https%3A%2F%2Fyoutu.be%2FM7lc1UVf-VE&titles=First+title&titles=Second+title&notes=First+note&notes=Second+note"
       case (urlDecodeAsForm payload :: Either Text CreateMixtapeForm) >>= createMixtapeFromForm of
         Left err -> expectationFailure (T.unpack err)
-        Right mixtape -> map (\(Track _ trackTitle _ _) -> trackTitle) mixtape.tracks `shouldBe` [Just "First title", Just "Second title"]
+        Right mixtape -> map (\track -> track.title) mixtape.tracks `shouldBe` [Just "First title", Just "Second title"]
 
   it "handles POST /api/mixtapes without PostgreSQL" $ do
     let video = requiredEither (mkYouTubeVideoId "dQw4w9WgXcQ")
-        mixtape = Mixtape "Tape" Nothing [Track video Nothing Nothing "A note"]
+        track = requiredEither (mkTrack video Nothing Nothing "A note")
+        mixtape = requiredEither (mkMixtape "Tape" Nothing [track])
         created = StoredMixtape
           { mixtapeId = requiredMaybe (mkMixtapeId "00000000-0000-4000-8000-000000000001")
           , title = "Tape"

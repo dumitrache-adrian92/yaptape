@@ -4,7 +4,7 @@ module Unit.YouTubeSpec (spec) where
 
 import Data.Aeson (decode)
 import Test.Hspec
-import Yaptape.Domain (Track (..))
+import Yaptape.Domain (Track)
 import Yaptape.YouTube
   ( YouTubeVideoId
   , YouTubeVideoIdError (..)

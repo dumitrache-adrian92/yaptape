@@ -24,12 +24,13 @@ import Data.Text (Text)
 import Servant.API (Header, Headers, getResponse)
 import Yaptape.Api (getMixtapeApi, mixtapeApi)
 import Yaptape.Domain
-  ( Mixtape (..)
+  ( Mixtape
   , MixtapeId
   , StoredMixtape (..)
   , StoredTrack (..)
-  , Track (..)
+  , mkMixtape
   , mkMixtapeId
+  , mkTrack
   , videoId
   , unMixtapeId
   , unTrackId
@@ -48,15 +49,13 @@ spec = describe "POST & GET /api/mixtapes (Integration)" $ do
     let vid1 = either (error . show) id (mkYouTubeVideoId "dQw4w9WgXcQ")
         vid2 = either (error . show) id (mkYouTubeVideoId "_rVvjslF6M8")
         vid3 = either (error . show) id (mkYouTubeVideoId "M7lc1UVf-VE")
-        mixtape = Mixtape
-          { title = "Integration tape"
-          , description = Just "Created by the API integration test"
-          , tracks =
-              [ Track vid1 (Just "First track") (Just "Artist 1") "Opening note"
-              , Track vid2 Nothing Nothing "Middle note"
-              , Track vid3 (Just "Final track") Nothing "Closing note"
-              ]
-          }
+        trk1 = either (error . show) id (mkTrack vid1 (Just "First track") (Just "Artist 1") "Opening note")
+        trk2 = either (error . show) id (mkTrack vid2 Nothing Nothing "Middle note")
+        trk3 = either (error . show) id (mkTrack vid3 (Just "Final track") Nothing "Closing note")
+        mixtape = either (error . show) id $ mkMixtape
+          "Integration tape"
+          (Just "Created by the API integration test")
+          [trk1, trk2, trk3]
     testWithApplication (pure app) $ \port -> do
       manager <- newManager defaultManagerSettings
       let env = mkClientEnv manager (BaseUrl Http "localhost" port "")

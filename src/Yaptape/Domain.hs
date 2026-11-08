@@ -21,10 +21,10 @@ module Yaptape.Domain
   , trackIdFromUUID
 
     -- * Domain Entities & Validation
-  , Track (..)
+  , Track (videoId, title, artist, note)
   , mkTrack
   , StoredTrack (..)
-  , Mixtape (..)
+  , Mixtape (title, description, tracks)
   , mkMixtape
   , StoredMixtape (..)
 

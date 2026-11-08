@@ -41,7 +41,7 @@ import System.FilePath (takeExtension, (</>))
 import Text.Read (readMaybe)
 import Yaptape.Db.Schema (MixtapeRow (..), TrackBatchParams, TrackRow (..), fromDbRows, toTrackBatchParams)
 import Yaptape.Domain
-  ( Mixtape (..)
+  ( Mixtape (title, description, tracks)
   , MixtapeId
   , mixtapeIdFromUUID
   , mixtapeIdToUUID

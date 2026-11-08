@@ -5,6 +5,7 @@ module Yaptape.Pages.Layout
   ( PageMeta (..)
   , defaultMeta
   , assetVersion
+  , configureAssetVersion
   , computeAssetVersion
   , versionedAsset
   , layout
@@ -16,6 +17,7 @@ module Yaptape.Pages.Layout
 import Control.Exception (IOException, try)
 import Data.Bits (xor)
 import qualified Data.ByteString as BS
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Text (Text)
 import qualified Data.Text as T
 import Data.Word (Word64)
@@ -50,9 +52,17 @@ computeAssetVersion staticDir = do
     fnv1aStep :: Word64 -> Word64 -> Word64
     fnv1aStep acc byte = (acc `xor` byte) * fnvPrime
 
+{-# NOINLINE assetVersionRef #-}
+assetVersionRef :: IORef Text
+assetVersionRef = unsafePerformIO (computeAssetVersion "static" >>= newIORef)
+
+-- | Recompute and store the global asset version hash from the configured static directory.
+configureAssetVersion :: FilePath -> IO ()
+configureAssetVersion staticDir = computeAssetVersion staticDir >>= writeIORef assetVersionRef
+
 {-# NOINLINE assetVersion #-}
 assetVersion :: Text
-assetVersion = unsafePerformIO (computeAssetVersion "static")
+assetVersion = unsafePerformIO (readIORef assetVersionRef)
 
 versionedAsset :: Text -> Text
 versionedAsset path = path <> "?v=" <> assetVersion

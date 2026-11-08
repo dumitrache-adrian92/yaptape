@@ -17,6 +17,7 @@ import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
 
 import Yaptape.Db.Postgres (DbConfig, createPoolFromConfig, resolveDbConfig, runMigrations, runMigrationsFrom)
+import Yaptape.Pages (configureAssetVersion)
 import Yaptape.Server (appForStore, appForStoreWithLogger, defaultStderrLogger, postgresMixtapeStore)
 import qualified Hasql.Pool as Pool
 
@@ -75,6 +76,7 @@ runWithStatic bundledStatic = runWithPaths bundledStatic "db/migrations"
 runWithPaths :: FilePath -> FilePath -> IO ()
 runWithPaths bundledStatic bundledMigrations = do
   cfg <- resolveConfig bundledStatic bundledMigrations
+  configureAssetVersion cfg.cfgStaticDir
   let settings =
         setPort cfg.cfgPort $
         setBeforeMainLoop (hPutStrLn stderr ("listening on port " ++ show cfg.cfgPort)) $

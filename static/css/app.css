@@ -511,19 +511,6 @@ textarea {
 .reel-two {
   right:27px
 }
-.shared-tracklist {
-  padding-left:26px
-}
-.shared-track {
-  padding:16px 10px;
-  border-top:1px solid #e1eaf2
-}
-.track-note-display {
-  background:#e6f0f8;
-  border-radius:10px;
-  padding:14px;
-  line-height:1.6
-}
 @media(max-width:600px) {
   .github-link {
     position:static;

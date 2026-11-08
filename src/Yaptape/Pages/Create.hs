@@ -26,7 +26,7 @@ import Yaptape.Domain
   , shareCodeFor
   )
 import Yaptape.Form (CreateMixtapeForm (..))
-import Yaptape.Pages.Layout (layout, versionedAsset)
+import Yaptape.Pages.Layout (PageMeta (..), defaultMeta, layout, layoutWithMeta, versionedAsset)
 import Yaptape.YouTube (youTubeUrlSpec)
 
 renderCreatePage :: Maybe Text -> Maybe CreateMixtapeForm -> Html ()
@@ -75,7 +75,7 @@ trackRow savedValues = div_ [class_ "track-row"] $ do
     button_ [type_ "button", makeAttribute "data-remove" "", class_ "icon-button remove-button", title_ "Remove track"] "×"
 
 renderCreatedPage :: StoredMixtape -> Html ()
-renderCreatedPage mixtape = layout "Your mixtape is ready · Yaptape" $ main_ [class_ "page-shell"] $ do
+renderCreatedPage mixtape = layoutWithMeta ((defaultMeta "Your mixtape is ready · Yaptape") { metaRobots = Just "noindex" }) $ main_ [class_ "page-shell"] $ do
   a_ [href_ "/", class_ "wordmark"] "yaptape"
   section_ [id_ "create-flow", class_ "create-card success-card"] $ do
     p_ [class_ "eyebrow"] "READY TO SEND"

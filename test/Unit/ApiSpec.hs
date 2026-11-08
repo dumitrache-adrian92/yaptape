@@ -222,6 +222,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       formResponse <- httpLbs formRequest manager
       statusCode (responseStatus formResponse) `shouldBe` 200
       BL8.unpack (responseBody formResponse) `shouldContain` "Your mixtape is ready"
+      BL8.unpack (responseBody formResponse) `shouldContain` "noindex"
       BL8.unpack (responseBody formResponse) `shouldContain` "/m/"
       invalidFormBase <- parseRequest ("http://localhost:" <> show port <> "/create")
       let invalidForm = invalidFormBase
@@ -255,6 +256,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       BL8.unpack (responseBody pageResponse) `shouldContain` "listening-shell"
       BL8.unpack (responseBody pageResponse) `shouldContain` "og:title"
       BL8.unpack (responseBody pageResponse) `shouldContain` "og:image"
+      BL8.unpack (responseBody pageResponse) `shouldContain` "noindex"
       playbackScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/playback.js")
       playbackScriptResponse <- httpLbs playbackScriptRequest manager
       statusCode (responseStatus playbackScriptResponse) `shouldBe` 200

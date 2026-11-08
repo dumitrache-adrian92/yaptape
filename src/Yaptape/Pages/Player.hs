@@ -66,6 +66,7 @@ renderMixtapePage mixtape = layoutWithMeta tapeMeta $ div_ [class_ "page-shell l
       , metaDescription = tapeDesc
       , metaImage = firstThumbnail
       , metaOgType = Just "music.playlist"
+      , metaRobots = Just "noindex"
       }
 
 renderQueueTrack :: Int -> StoredTrack -> Html ()

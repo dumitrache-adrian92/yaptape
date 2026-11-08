@@ -72,6 +72,7 @@ data PageMeta = PageMeta
   , metaDescription :: Maybe Text
   , metaImage :: Maybe Text
   , metaOgType :: Maybe Text
+  , metaRobots :: Maybe Text
   }
 
 defaultMeta :: Text -> PageMeta
@@ -80,6 +81,7 @@ defaultMeta pageTitle = PageMeta
   , metaDescription = Just "Make a mixtape from YouTube tracks, add a note to each track, and share it."
   , metaImage = Nothing
   , metaOgType = Just "website"
+  , metaRobots = Nothing
   }
 
 layout :: Text -> Html () -> Html ()
@@ -91,6 +93,7 @@ layoutWithMeta pageMeta content = doctypehtml_ $ html_ [lang_ "en"] $ do
     meta_ [charset_ "utf-8"]
     meta_ [name_ "viewport", content_ "width=device-width, initial-scale=1"]
     title_ (toHtml pageMeta.metaTitle)
+    maybe mempty (\robots -> meta_ [name_ "robots", content_ robots]) pageMeta.metaRobots
     maybe mempty (\desc -> meta_ [name_ "description", content_ desc]) pageMeta.metaDescription
     meta_ [makeAttribute "property" "og:title", content_ pageMeta.metaTitle]
     maybe mempty (\desc -> meta_ [makeAttribute "property" "og:description", content_ desc]) pageMeta.metaDescription

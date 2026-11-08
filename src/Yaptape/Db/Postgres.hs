@@ -110,20 +110,21 @@ runMigrationsFrom pool migrationsDir = do
   scripts <- traverse (\f -> do
     bytes <- BS.readFile (migrationsDir </> f)
     pure (T.pack f, bytes)) sqlFileNames
-  Pool.use pool $ do
-    Session.sql "BEGIN"
-    Session.sql "SELECT pg_advisory_xact_lock(89278273)"
-    Session.sql
-      "CREATE TABLE IF NOT EXISTS schema_migrations (\
-      \  version text PRIMARY KEY,\
-      \  applied_at timestamptz NOT NULL DEFAULT now()\
-      \)"
-    applied <- Session.statement () selectAppliedMigrations
-    forM_ scripts $ \(version, scriptBytes) ->
-      unless (version `elem` applied) $ do
-        Session.sql scriptBytes
-        Session.statement version insertAppliedMigration
-    Session.sql "COMMIT"
+  Pool.use pool $ Transactions.transaction
+    Transactions.ReadCommitted
+    Transactions.Write
+    (do
+      Transaction.sql "SELECT pg_advisory_xact_lock(89278273)"
+      Transaction.sql
+        "CREATE TABLE IF NOT EXISTS schema_migrations (\
+        \  version text PRIMARY KEY,\
+        \  applied_at timestamptz NOT NULL DEFAULT now()\
+        \)"
+      applied <- Transaction.statement () selectAppliedMigrations
+      forM_ scripts $ \(version, scriptBytes) ->
+        unless (version `elem` applied) $ do
+          Transaction.sql scriptBytes
+          Transaction.statement version insertAppliedMigration)
 
 -- | Return all applied migration filenames ordered lexicographically.
 getAppliedMigrations :: Pool.Pool -> IO (Either Pool.UsageError [Text])

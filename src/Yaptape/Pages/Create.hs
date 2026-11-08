@@ -6,10 +6,13 @@ module Yaptape.Pages.Create
   , renderCreatedPage
   ) where
 
+import Data.Aeson (encode)
+import qualified Data.ByteString.Lazy as LBS
 import Data.List (zip4)
 import Data.Maybe (fromMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import Lucid
 import Lucid.Base (makeAttribute)
 import Servant.API (ToHttpApiData (toUrlPiece))
@@ -24,11 +27,12 @@ import Yaptape.Domain
   )
 import Yaptape.Form (CreateMixtapeForm (..))
 import Yaptape.Pages.Layout (layout, versionedAsset)
+import Yaptape.YouTube (youTubeUrlSpec)
 
 renderCreatePage :: Maybe Text -> Maybe CreateMixtapeForm -> Html ()
 renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" $ main_ [class_ "page-shell"] $ do
   a_ [href_ "/", class_ "wordmark"] "yaptape"
-  section_ [id_ "create-flow", class_ "create-card"] $ do
+  section_ [id_ "create-flow", class_ "create-card", makeAttribute "data-youtube-spec" serializedYouTubeSpec] $ do
     p_ [class_ "eyebrow"] "MAKE YOUR TAPE"
     h1_ "Pick the songs. Add the words."
     p_ [class_ "muted"] "Paste a YouTube link for each track and leave a note for the person listening."
@@ -47,6 +51,8 @@ renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" 
       p_ [class_ "fine-print"] "You can rearrange tracks before sharing your tape."
   script_ [src_ "/assets/js/htmx.min.js", defer_ "", makeAttribute "integrity" "sha256-Iig+9oy3VFkU8KiKG97cclanA9HVgMHSVSF9ClDTExM=", makeAttribute "crossorigin" "anonymous"] (mempty :: Html ())
   script_ [src_ (versionedAsset "/assets/js/create.js"), defer_ ""] (mempty :: Html ())
+  where
+    serializedYouTubeSpec = TE.decodeUtf8 (LBS.toStrict (encode youTubeUrlSpec))
 
 formRows :: Maybe CreateMixtapeForm -> [Maybe (Text, Text, Text, Text)]
 formRows Nothing = [Nothing]

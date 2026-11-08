@@ -1,13 +1,19 @@
+function loadYouTubeSpec() {
+  const el=document.querySelector('#create-flow[data-youtube-spec]');
+  return el?JSON.parse(el.dataset.youtubeSpec):null
+}
 function youtubeVideoId(value) {
   try {
+    const spec=loadYouTubeSpec();
+    if(!spec)return '';
     const url=new URL(value),host=url.hostname.toLowerCase(),parts=url.pathname.split('/').filter(Boolean);
     let id='';
-    if(['youtube.com','www.youtube.com','m.youtube.com','music.youtube.com'].includes(host)) {
-      if(parts[0]==='watch')id=url.searchParams.get('v')||'';
-      else if(['shorts','embed','live'].includes(parts[0]))id=parts[1]||''
+    if(spec.specPrimaryHosts.includes(host)) {
+      if(parts[0]===spec.specWatchPath)id=url.searchParams.get(spec.specWatchParam)||'';
+      else if(spec.specPathPrefixes.includes(parts[0]))id=parts[1]||''
     }
-    else if(['youtu.be','www.youtu.be'].includes(host))id=parts[0]||'';
-    return ['https:','http:'].includes(url.protocol)&&/^[A-Za-z0-9_-]{11}$/.test(id)?id:''
+    else if(spec.specShortHosts.includes(host))id=parts[0]||'';
+    return spec.specSchemes.includes(url.protocol)&&new RegExp(spec.specIdPattern).test(id)?id:''
   }
   catch(_) {
     return ''

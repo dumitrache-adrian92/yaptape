@@ -1,6 +1,8 @@
 module Yaptape.YouTube
   ( YouTubeVideoId
   , YouTubeVideoIdError (..)
+  , YouTubeUrlSpec (..)
+  , youTubeUrlSpec
   , mkYouTubeVideoId
   , parseYouTubeUrl
   , unYouTubeVideoId
@@ -10,8 +12,10 @@ module Yaptape.YouTube
 import Yaptape.YouTube.Internal
   ( YouTubeVideoId
   , YouTubeVideoIdError (..)
+  , YouTubeUrlSpec (..)
   , mkYouTubeVideoId
   , parseYouTubeUrl
   , renderYouTubeVideoIdError
   , unYouTubeVideoId
+  , youTubeUrlSpec
   )

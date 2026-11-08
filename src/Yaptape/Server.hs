@@ -67,7 +67,7 @@ import Yaptape.Domain
   )
 import Yaptape.Api (appApi)
 import Yaptape.Form (CreateMixtapeForm, createMixtapeFromForm)
-import Yaptape.Pages (renderCreatedPage, renderCreatePage, renderLandingPage, renderMixtapePage)
+import Yaptape.Pages (renderCreatedPage, renderCreatePage, renderErrorPage, renderLandingPage, renderMixtapePage)
 
 data StoreError = StoreUnavailable | StoreFailure
   deriving (Show, Eq)
@@ -170,17 +170,15 @@ createPageHandler = pure (renderCreatePage Nothing Nothing)
 
 submitCreateFormHandler :: MixtapeStore -> CreateMixtapeForm -> Handler (Html ())
 submitCreateFormHandler store form = case createMixtapeFromForm form of
-  Left validationError -> throwError err422
-    { errBody = renderBS (renderCreatePage (Just validationError) (Just form))
-    , errHeaders = [(hContentType, "text/html; charset=utf-8")]
-    }
+  Left validationError -> throwError (htmlError err422 (renderCreatePage (Just validationError) (Just form)))
   Right mixtape -> do
     result <- liftIO (storeCreateMixtape store mixtape)
     case result of
-      Left _ -> throwError err500
-        { errBody = renderBS (renderCreatePage (Just "We could not save your mixtape. Please try again.") (Just form))
-        , errHeaders = [(hContentType, "text/html; charset=utf-8")]
-        }
+      Left storeError ->
+        let baseError = case storeError of
+              StoreUnavailable -> err503
+              StoreFailure -> err500
+        in throwError (htmlError baseError (renderCreatePage (Just "We could not save your mixtape. Please try again.") (Just form)))
       Right created -> do
         let target = "/created/" <> toUrlPiece (shareCodeFor created.mixtapeId)
             targetBs = TE.encodeUtf8 target
@@ -195,8 +193,8 @@ createdPageHandler :: MixtapeStore -> ShareCode -> Handler (Html ())
 createdPageHandler store shareCode = do
   result <- liftIO (storeGetMixtape store (mixtapeIdFromShareCode shareCode))
   case result of
-    Left storeError -> throwError (storeErrorResponse storeError)
-    Right Nothing -> throwError err404
+    Left storeError -> throwError (htmlStoreErrorResponse storeError)
+    Right Nothing -> throwError htmlNotFoundError
     Right (Just mixtape) -> pure (renderCreatedPage mixtape)
 
 createMixtapeHandler
@@ -225,8 +223,8 @@ getSharedMixtapeHandler :: MixtapeStore -> ShareCode -> Handler (Html ())
 getSharedMixtapeHandler store shareCode = do
   result <- liftIO (storeGetMixtape store (mixtapeIdFromShareCode shareCode))
   case result of
-    Left storeError -> throwError (storeErrorResponse storeError)
-    Right Nothing -> throwError err404
+    Left storeError -> throwError (htmlStoreErrorResponse storeError)
+    Right Nothing -> throwError htmlNotFoundError
     Right (Just mixtape) -> pure (renderMixtapePage mixtape)
 
 storeErrorResponse :: StoreError -> ServerError
@@ -234,6 +232,24 @@ storeErrorResponse storeError =
   case storeError of
     StoreUnavailable -> jsonError err503 "storage_unavailable"
     StoreFailure -> jsonError err500 "internal_error"
+
+htmlStoreErrorResponse :: StoreError -> ServerError
+htmlStoreErrorResponse storeError =
+  case storeError of
+    StoreUnavailable ->
+      htmlError err503 (renderErrorPage "Temporarily unavailable" "We could not reach the mixtape archive right now. Please try again in a moment.")
+    StoreFailure ->
+      htmlError err500 (renderErrorPage "Something went wrong" "We could not load this mixtape right now. Please try again.")
+
+htmlNotFoundError :: ServerError
+htmlNotFoundError =
+  htmlError err404 (renderErrorPage "Mixtape not found" "We could not find a mixtape at this link.")
+
+htmlError :: ServerError -> Html () -> ServerError
+htmlError response page = response
+  { errBody = renderBS page
+  , errHeaders = (hContentType, "text/html; charset=utf-8") : errHeaders response
+  }
 
 jsonError :: ServerError -> String -> ServerError
 jsonError response errorCode = response

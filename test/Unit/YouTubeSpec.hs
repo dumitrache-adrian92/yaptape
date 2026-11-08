@@ -9,6 +9,7 @@ import Yaptape.YouTube
   ( YouTubeVideoId
   , YouTubeVideoIdError (..)
   , mkYouTubeVideoId
+  , parseYouTubeUrl
   , unYouTubeVideoId
   )
 
@@ -65,3 +66,14 @@ spec = describe "Yaptape.YouTube" $ do
     it "fails decoding invalid ID in Track record" $ do
       let res = decode "{\"videoId\":\"not-valid\",\"note\":\"test\"}" :: Maybe Track
       res `shouldBe` Nothing
+
+  describe "parseYouTubeUrl" $ do
+    it "extracts video IDs from youtube.com watch, shorts, embed, live, and youtu.be URLs" $ do
+      fmap unYouTubeVideoId (parseYouTubeUrl "https://www.youtube.com/watch?v=dQw4w9WgXcQ") `shouldBe` Right "dQw4w9WgXcQ"
+      fmap unYouTubeVideoId (parseYouTubeUrl "https://youtu.be/dQw4w9WgXcQ") `shouldBe` Right "dQw4w9WgXcQ"
+      fmap unYouTubeVideoId (parseYouTubeUrl "https://youtube.com/shorts/dQw4w9WgXcQ") `shouldBe` Right "dQw4w9WgXcQ"
+      fmap unYouTubeVideoId (parseYouTubeUrl "https://music.youtube.com/watch?v=dQw4w9WgXcQ&feature=share") `shouldBe` Right "dQw4w9WgXcQ"
+
+    it "rejects non-YouTube domains and malformed URLs" $ do
+      parseYouTubeUrl "https://example.com/watch?v=dQw4w9WgXcQ" `shouldSatisfy` either (const True) (const False)
+      parseYouTubeUrl "not a url" `shouldSatisfy` either (const True) (const False)

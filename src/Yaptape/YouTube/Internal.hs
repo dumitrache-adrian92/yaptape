@@ -8,6 +8,7 @@ module Yaptape.YouTube.Internal
   ( YouTubeVideoId (..)
   , YouTubeVideoIdError (..)
   , mkYouTubeVideoId
+  , parseYouTubeUrl
   , unsafeMkYouTubeVideoId
   , renderYouTubeVideoIdError
   ) where
@@ -16,6 +17,7 @@ import Data.Aeson (FromJSON (..), ToJSON, withText)
 import Data.Text (Text)
 import qualified Data.Text as T
 import GHC.Generics (Generic)
+import Network.URI (URI (..), URIAuth (..), parseURI)
 import Servant.API (FromHttpApiData (..), ToHttpApiData)
 
 -- | Newtype representing a validated YouTube video ID.
@@ -64,9 +66,38 @@ validateCandidate cand
     invalidChars = T.filter (not . isBase64UrlChar) cand
 
 -- | Smart constructor for 'YouTubeVideoId'.
--- Normalizes input from URLs or raw strings and validates length & characters.
+-- Trims surrounding whitespace and validates length & base64url characters.
 mkYouTubeVideoId :: Text -> Either YouTubeVideoIdError YouTubeVideoId
 mkYouTubeVideoId = validateCandidate . T.strip
+
+-- | Parse a YouTube URL (youtube.com/watch, /shorts/, /embed/, /live/, or youtu.be)
+-- and extract a validated 'YouTubeVideoId'.
+parseYouTubeUrl :: Text -> Either Text YouTubeVideoId
+parseYouTubeUrl raw = do
+  uri <- maybe invalid Right (parseURI (T.unpack (T.strip raw)))
+  authority <- maybe invalid Right (uriAuthority uri)
+  let host = T.toLower (T.pack (uriRegName authority))
+      pathParts = filter (not . T.null) (T.splitOn "/" (T.pack (uriPath uri)))
+      candidate
+        | uriScheme uri `elem` ["https:", "http:"] && host `elem` ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"] =
+            case pathParts of
+              ["watch"] -> queryValue "v" (T.pack (uriQuery uri))
+              [kind, video] | kind `elem` ["shorts", "embed", "live"] -> Just video
+              _ -> Nothing
+        | uriScheme uri `elem` ["https:", "http:"] && host `elem` ["youtu.be", "www.youtu.be"] =
+            case pathParts of
+              [video] -> Just video
+              _ -> Nothing
+        | otherwise = Nothing
+  videoText <- maybe invalid Right candidate
+  either (const invalid) Right (mkYouTubeVideoId videoText)
+  where
+    invalid = Left "Enter a YouTube video link (youtube.com/watch?v=… or youtu.be/…)."
+    queryValue key =
+      lookup key
+        . map (\field -> let (name, value) = T.breakOn "=" field in (name, T.drop 1 value))
+        . T.splitOn "&"
+        . T.drop 1
 
 instance FromJSON YouTubeVideoId where
   parseJSON = withText "YouTubeVideoId" $ \t ->

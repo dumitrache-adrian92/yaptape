@@ -8,16 +8,20 @@ module Yaptape.Db.Schema
   ( -- * Database Row Types
     MixtapeRow (..)
   , TrackRow (..)
+  , TrackBatchParams
 
     -- * Domain <-> Database Mappings
   , fromDbRows
   , toTrackRows
+  , toTrackBatchParams
   ) where
 
 import Data.Aeson (FromJSON, ToJSON)
+import Data.Int (Int32)
 import qualified Data.List as List
 import Data.Text (Text)
 import Data.Time (UTCTime)
+import qualified Data.UUID as UUID
 import GHC.Generics (Generic)
 
 import Yaptape.Domain
@@ -26,8 +30,9 @@ import Yaptape.Domain
   , StoredTrack (..)
   , Track (..)
   , TrackId
+  , mixtapeIdToUUID
   )
-import Yaptape.YouTube (YouTubeVideoId)
+import Yaptape.YouTube (YouTubeVideoId, unYouTubeVideoId)
 
 -- | Database row representing a record in the 'mixtapes' table.
 data MixtapeRow = MixtapeRow
@@ -76,9 +81,9 @@ fromDbRows mRow tRows =
 -- | Convert a list of domain 'Track's to relational 'TrackRow's,
 -- assigning 0-indexed 'trackOrder' and applying a custom ID generator.
 toTrackRows :: MixtapeId -> (Int -> TrackId) -> [Track] -> [TrackRow]
-toTrackRows mId mkTrackId trks =
+toTrackRows mId makeTrackId trks =
   zipWith (\idx t -> TrackRow
-    { trackId = mkTrackId idx
+    { trackId = makeTrackId idx
     , mixtapeId = mId
     , trackOrder = idx
     , videoId = t.videoId
@@ -86,3 +91,17 @@ toTrackRows mId mkTrackId trks =
     , artist = t.artist
     , note = t.note
     }) [0..] trks
+
+-- | Columnar batch parameters for PostgreSQL @UNNEST@ track insertion.
+type TrackBatchParams = (UUID.UUID, [Int32], [Text], [Maybe Text], [Maybe Text], [Text])
+
+-- | Convert a 'MixtapeId' and domain 'Track' list into columnar arrays for batch insertion.
+toTrackBatchParams :: MixtapeId -> [Track] -> TrackBatchParams
+toTrackBatchParams mId trks =
+  ( mixtapeIdToUUID mId
+  , [0 :: Int32 .. fromIntegral (length trks - 1)]
+  , map (unYouTubeVideoId . (\t -> t.videoId)) trks
+  , map (\t -> t.title) trks
+  , map (\t -> t.artist) trks
+  , map (\t -> t.note) trks
+  )

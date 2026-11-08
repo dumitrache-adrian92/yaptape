@@ -6,6 +6,7 @@ module Yaptape.Pages
   , renderCreatePage
   , renderCreatedPage
   , renderMixtapePage
+  , renderErrorPage
   ) where
 
 import Data.Maybe (fromMaybe)
@@ -87,6 +88,15 @@ renderCreatedPage mixtape = layout "Your mixtape is ready · Yaptape" $ main_ [c
     a_ [href_ "/create", class_ "text-link secondary-link"] "Make another"
     script_ [src_ "/assets/js/copy-link.js", defer_ ""] (mempty :: Html ())
 
+renderErrorPage :: Text -> Text -> Html ()
+renderErrorPage heading message = layout (heading <> " · Yaptape") $ main_ [class_ "page-shell"] $ do
+  a_ [href_ "/", class_ "wordmark"] "yaptape"
+  section_ [class_ "create-card"] $ do
+    p_ [class_ "eyebrow"] "SOMETHING WENT WRONG"
+    h1_ (toHtml heading)
+    p_ [class_ "muted"] (toHtml message)
+    a_ [href_ "/", class_ "button"] "Back to Yaptape"
+
 data PageMeta = PageMeta
   { metaTitle :: Text
   , metaDescription :: Maybe Text
@@ -95,8 +105,8 @@ data PageMeta = PageMeta
   }
 
 defaultMeta :: Text -> PageMeta
-defaultMeta title = PageMeta
-  { metaTitle = title
+defaultMeta pageTitle = PageMeta
+  { metaTitle = pageTitle
   , metaDescription = Just "Make a mixtape from YouTube tracks, add a note to each track, and share it."
   , metaImage = Nothing
   , metaOgType = Just "website"

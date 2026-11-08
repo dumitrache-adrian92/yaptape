@@ -33,13 +33,15 @@ import Yaptape.Domain
   , StoredTrack (..)
   , ShareCode
   , Track (..)
+  , mkMixtape
   , mkMixtapeId
+  , mkTrack
   , mkTrackId
   , shareCodeFor
   )
 import Servant.API (ToHttpApiData (toUrlPiece))
 import Servant.API (FromHttpApiData (parseUrlPiece))
-import Yaptape.Server (MixtapeStore (..), appForStore)
+import Yaptape.Server (MixtapeStore (..), StoreError (..), appForStore)
 import Yaptape.Form (CreateMixtapeForm (..), createMixtapeFromForm)
 import Yaptape.YouTube (mkYouTubeVideoId)
 import Web.FormUrlEncoded (urlDecodeAsForm)
@@ -71,6 +73,23 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       blankTitle `shouldBe` Nothing
       blankNote `shouldBe` Nothing
       noTracks `shouldBe` Nothing
+
+    it "enforces field length limits and normalizes optional whitespace in mkTrack and mkMixtape" $ do
+      let vid = requiredEither (mkYouTubeVideoId "dQw4w9WgXcQ")
+          validTrack = requiredEither (mkTrack vid (Just "  ") (Just "  Artist  ") "  Note  ")
+      validTrack.title `shouldBe` Nothing
+      validTrack.artist `shouldBe` Just "Artist"
+      validTrack.note `shouldBe` "Note"
+      mkTrack vid (Just (T.replicate 301 "a")) Nothing "Note" `shouldSatisfy` either (const True) (const False)
+      mkTrack vid Nothing (Just (T.replicate 201 "a")) "Note" `shouldSatisfy` either (const True) (const False)
+      mkTrack vid Nothing Nothing (T.replicate 2001 "a") `shouldSatisfy` either (const True) (const False)
+
+      let validTape = requiredEither (mkMixtape "  My Tape  " (Just "   ") [validTrack])
+      validTape.title `shouldBe` "My Tape"
+      validTape.description `shouldBe` Nothing
+      mkMixtape (T.replicate 121 "a") Nothing [validTrack] `shouldSatisfy` either (const True) (const False)
+      mkMixtape "Tape" (Just (T.replicate 501 "a")) [validTrack] `shouldSatisfy` either (const True) (const False)
+      mkMixtape "Tape" Nothing ( replicate 101 validTrack ) `shouldSatisfy` either (const True) (const False)
 
     it "uses the title looked up from YouTube as the track title" $ do
       let form = CreateMixtapeForm "Tape" Nothing
@@ -198,6 +217,68 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       playbackScriptResponse <- httpLbs playbackScriptRequest manager
       statusCode (responseStatus playbackScriptResponse) `shouldBe` 200
       BL8.unpack (responseBody playbackScriptResponse) `shouldContain` "youtube.com/iframe_api"
+      missingPageRequest <- parseRequest
+        ("http://localhost:" <> show port <> "/m/" <> T.unpack (toUrlPiece (shareCodeFor missingId)))
+      missingPageResponse <- httpLbs missingPageRequest manager
+      statusCode (responseStatus missingPageResponse) `shouldBe` 404
+      lookup "Content-Type" (responseHeaders missingPageResponse) `shouldBe` Just "text/html; charset=utf-8"
+      BL8.unpack (responseBody missingPageResponse) `shouldContain` "Mixtape not found"
+
+  it "returns HTML error pages for browser routes and JSON errors for API routes when the store fails" $ do
+    let sampleId = requiredMaybe (mkMixtapeId "00000000-0000-4000-8000-000000000001")
+        sampleShareCode = T.unpack (toUrlPiece (shareCodeFor sampleId))
+        unavailableApp = appForStore MixtapeStore
+          { storeCreateMixtape = \_ -> pure (Left StoreUnavailable)
+          , storeGetMixtape = \_ -> pure (Left StoreUnavailable)
+          }
+        failureApp = appForStore MixtapeStore
+          { storeCreateMixtape = \_ -> pure (Left StoreFailure)
+          , storeGetMixtape = \_ -> pure (Left StoreFailure)
+          }
+
+    testWithApplication (pure unavailableApp) $ \port -> do
+      manager <- newManager defaultManagerSettings
+      pageReq <- parseRequest ("http://localhost:" <> show port <> "/m/" <> sampleShareCode)
+      pageResp <- httpLbs pageReq manager
+      statusCode (responseStatus pageResp) `shouldBe` 503
+      lookup "Content-Type" (responseHeaders pageResp) `shouldBe` Just "text/html; charset=utf-8"
+      BL8.unpack (responseBody pageResp) `shouldContain` "Temporarily unavailable"
+
+      createdReq <- parseRequest ("http://localhost:" <> show port <> "/created/" <> sampleShareCode)
+      createdResp <- httpLbs createdReq manager
+      statusCode (responseStatus createdResp) `shouldBe` 503
+      lookup "Content-Type" (responseHeaders createdResp) `shouldBe` Just "text/html; charset=utf-8"
+
+      formReqBase <- parseRequest ("http://localhost:" <> show port <> "/create")
+      let formReq = formReqBase
+            { method = "POST"
+            , requestHeaders = [("Content-Type", "application/x-www-form-urlencoded")]
+            , requestBody = RequestBodyLBS "title=My+Tape&videoUrls=https%3A%2F%2Fyoutu.be%2FdQw4w9WgXcQ&notes=Note"
+            }
+      formResp <- httpLbs formReq manager
+      statusCode (responseStatus formResp) `shouldBe` 503
+      lookup "Content-Type" (responseHeaders formResp) `shouldBe` Just "text/html; charset=utf-8"
+      BL8.unpack (responseBody formResp) `shouldContain` "We could not save your mixtape"
+
+      apiReq <- parseRequest ("http://localhost:" <> show port <> "/api/mixtapes/" <> T.unpack (toUrlPiece sampleId))
+      apiResp <- httpLbs apiReq manager
+      statusCode (responseStatus apiResp) `shouldBe` 503
+      lookup "Content-Type" (responseHeaders apiResp) `shouldBe` Just "application/json"
+      BL8.unpack (responseBody apiResp) `shouldContain` "storage_unavailable"
+
+    testWithApplication (pure failureApp) $ \port -> do
+      manager <- newManager defaultManagerSettings
+      pageReq <- parseRequest ("http://localhost:" <> show port <> "/m/" <> sampleShareCode)
+      pageResp <- httpLbs pageReq manager
+      statusCode (responseStatus pageResp) `shouldBe` 500
+      lookup "Content-Type" (responseHeaders pageResp) `shouldBe` Just "text/html; charset=utf-8"
+      BL8.unpack (responseBody pageResp) `shouldContain` "Something went wrong"
+
+      apiReq <- parseRequest ("http://localhost:" <> show port <> "/api/mixtapes/" <> T.unpack (toUrlPiece sampleId))
+      apiResp <- httpLbs apiReq manager
+      statusCode (responseStatus apiResp) `shouldBe` 500
+      lookup "Content-Type" (responseHeaders apiResp) `shouldBe` Just "application/json"
+      BL8.unpack (responseBody apiResp) `shouldContain` "internal_error"
 
 requiredMaybe :: Maybe a -> a
 requiredMaybe = maybe (error "invalid UUID fixture") id

@@ -7,11 +7,9 @@ module Yaptape.Form
   ) where
 
 import Data.Text (Text)
-import qualified Data.Text as T
-import Network.URI (URI (..), URIAuth (..), parseURI)
 import Web.FormUrlEncoded (FromForm (..), lookupAll, lookupMaybe, lookupUnique)
-import Yaptape.Domain (Mixtape (..), Track (Track))
-import Yaptape.YouTube (YouTubeVideoId, mkYouTubeVideoId)
+import Yaptape.Domain (Mixtape, mkMixtape, mkTrack)
+import Yaptape.YouTube (parseYouTubeUrl)
 
 data CreateMixtapeForm = CreateMixtapeForm
   { formTitle :: Text
@@ -31,49 +29,13 @@ instance FromForm CreateMixtapeForm where
 
 createMixtapeFromForm :: CreateMixtapeForm -> Either Text Mixtape
 createMixtapeFromForm form
-  | T.null (T.strip form.formTitle) = Left "Give your mixtape a title."
-  | T.length (T.strip form.formTitle) > 120 = Left "Keep your mixtape title under 120 characters."
   | null form.formNotes = Left "Add at least one track."
-  | length form.formNotes > 100 = Left "A mixtape can have at most 100 tracks."
   | length form.formVideoUrls /= length form.formNotes = Left "Each track needs a YouTube link and a note."
   | length form.formTitles > length form.formNotes = Left "Track titles must match the tracklist."
-  | maybe False ((> 500) . T.length . T.strip) form.formDescription = Left "Keep the description under 500 characters."
   | otherwise = do
       parsedTracks <- traverse makeTrack (zip3 form.formVideoUrls form.formNotes (form.formTitles <> repeat ""))
-      pure (Mixtape (T.strip form.formTitle) (nonEmpty form.formDescription) parsedTracks)
+      mkMixtape form.formTitle form.formDescription parsedTracks
   where
-    makeTrack (url, trackNote, trackTitle)
-      | T.null (T.strip trackNote) = Left "Add a note for every track."
-      | T.length (T.strip trackNote) > 2000 = Left "Keep each note under 2000 characters."
-      | T.length (T.strip trackTitle) > 300 = Left "Keep each track title under 300 characters."
-      | otherwise = do
-          parsedVideoId <- parseYouTubeUrl url
-          pure (Track parsedVideoId (nonEmpty (Just trackTitle)) Nothing (T.strip trackNote))
-
-nonEmpty :: Maybe Text -> Maybe Text
-nonEmpty = (>>= \value -> if T.null (T.strip value) then Nothing else Just (T.strip value))
-
-parseYouTubeUrl :: Text -> Either Text YouTubeVideoId
-parseYouTubeUrl raw = do
-  uri <- maybe invalid Right (parseURI (T.unpack (T.strip raw)))
-  authority <- maybe invalid Right (uriAuthority uri)
-  let host = T.toLower (T.pack (uriRegName authority))
-      pathParts = filter (not . T.null) (T.splitOn "/" (T.pack (uriPath uri)))
-      candidate
-        | uriScheme uri `elem` ["https:", "http:"] && host `elem` ["youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com"] =
-            case pathParts of
-              ["watch"] -> queryValue "v" (T.pack (uriQuery uri))
-              [kind, video] | kind `elem` ["shorts", "embed", "live"] -> Just video
-              _ -> Nothing
-        | uriScheme uri `elem` ["https:", "http:"] && host `elem` ["youtu.be", "www.youtu.be"] =
-            case pathParts of
-              [video] -> Just video
-              _ -> Nothing
-        | otherwise = Nothing
-  videoText <- maybe invalid Right candidate
-  either (const invalid) Right (mkYouTubeVideoId videoText)
-  where
-    invalid = Left "Enter a YouTube video link (youtube.com/watch?v=… or youtu.be/…)."
-
-queryValue :: Text -> Text -> Maybe Text
-queryValue key = lookup key . map (\field -> let (name, value) = T.breakOn "=" field in (name, T.drop 1 value)) . T.splitOn "&" . T.drop 1
+    makeTrack (url, trackNote, trackTitle) = do
+      parsedVideoId <- parseYouTubeUrl url
+      mkTrack parsedVideoId (Just trackTitle) Nothing trackNote

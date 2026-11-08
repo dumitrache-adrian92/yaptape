@@ -12,10 +12,12 @@ import Yaptape.Db
   ( MixtapeRow (..)
   , TrackRow (..)
   , fromDbRows
+  , toTrackBatchParams
   , toTrackRows
   )
 import Yaptape.Domain
   ( mkMixtapeId
+  , mixtapeIdToUUID
   , StoredMixtape (..)
   , StoredTrack (..)
   , Track (..)
@@ -71,6 +73,18 @@ spec = describe "Yaptape.Db" $ do
       -- Pass in reverse order to ensure it sorts by trackOrder
       let reconstructed = fromDbRows mRow [r2, r1]
       reconstructed `shouldBe` serverMixtape
+
+  describe "toTrackBatchParams" $ do
+    it "extracts columnar arrays with 0-indexed track orders and UUID mixtapeId" $ do
+      let params = toTrackBatchParams mId [domainTrack1, domainTrack2]
+      params `shouldBe`
+        ( mixtapeIdToUUID mId
+        , [0, 1]
+        , ["dQw4w9WgXcQ", "_rVvjslF6M8"]
+        , [Just "Track 1", Nothing]
+        , [Just "Artist 1", Nothing]
+        , ["Note 1", "Note 2"]
+        )
 
 requiredId :: (Text -> Maybe a) -> Text -> a
 requiredId make raw = maybe (error "invalid UUID fixture") id (make raw)

@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedRecordDot #-}
+
 module Yaptape (run, runWithStatic, withApp) where
 
 import Network.Wai (Application)
@@ -14,19 +16,20 @@ import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
 
-import Yaptape.Db.Postgres (createPool)
+import Yaptape.Db.Postgres (DbConfig, createPoolFromConfig, resolveDbConfig)
 import Yaptape.Server (appForStore, appForStoreAt, postgresMixtapeStore)
 import qualified Hasql.Pool as Pool
 
 run :: IO ()
 run = runWithStatic "static"
 
-withPool :: (Pool.Pool -> IO a) -> IO a
-withPool = bracket createPool Pool.release
+withPool :: DbConfig -> (Pool.Pool -> IO a) -> IO a
+withPool dbCfg = bracket (createPoolFromConfig dbCfg) Pool.release
 
 data Config = Config
   { cfgPort       :: Port
   , cfgStaticDir  :: FilePath
+  , cfgDb         :: DbConfig
   }
 
 resolveConfig :: FilePath -> IO Config
@@ -34,9 +37,11 @@ resolveConfig bundledStatic = do
   portEnv   <- lookupEnv "PORT"
   staticEnv <- lookupEnv "STATIC_DIR"
   port <- either (ioError . userError) pure (parsePort portEnv)
+  dbCfg <- resolveDbConfig
   pure Config
     { cfgPort      = port
     , cfgStaticDir = fromMaybe bundledStatic staticEnv
+    , cfgDb        = dbCfg
     }
 
 parsePort :: Maybe String -> Either String Port
@@ -49,13 +54,15 @@ parsePort (Just raw) = case readMaybe raw of
 
 runWithStatic :: FilePath -> IO ()
 runWithStatic bundledStatic = do
-  Config{cfgPort = port, cfgStaticDir = staticDir} <- resolveConfig bundledStatic
+  cfg <- resolveConfig bundledStatic
   let settings =
-        setPort port $
-        setBeforeMainLoop (hPutStrLn stderr ("listening on port " ++ show port)) $
+        setPort cfg.cfgPort $
+        setBeforeMainLoop (hPutStrLn stderr ("listening on port " ++ show cfg.cfgPort)) $
         defaultSettings
-  withPool $ \pool ->
-    runSettings settings (appForStoreAt (postgresMixtapeStore pool) staticDir)
+  withPool cfg.cfgDb $ \pool ->
+    runSettings settings (appForStoreAt (postgresMixtapeStore pool) cfg.cfgStaticDir)
 
 withApp :: (Application -> IO a) -> IO a
-withApp action = withPool (action . appForStore . postgresMixtapeStore)
+withApp action = do
+  dbCfg <- resolveDbConfig
+  withPool dbCfg (action . appForStore . postgresMixtapeStore)

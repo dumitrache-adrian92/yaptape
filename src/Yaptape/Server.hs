@@ -3,7 +3,10 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Yaptape.Server
-  ( server
+  ( AppEnv (..)
+  , AppM
+  , server
+  , serverT
   , MixtapeStore (..)
   , StoreError (..)
   , postgresMixtapeStore
@@ -17,6 +20,8 @@ module Yaptape.Server
 
 import Control.Exception (AsyncException, SomeException, fromException, tryJust)
 import Control.Monad.IO.Class (liftIO)
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.Reader (ReaderT, asks, runReaderT)
 import Data.IORef (newIORef, atomicModifyIORef')
 import qualified Data.ByteString as BS
 import Data.Aeson (encode, object, (.=))
@@ -41,12 +46,14 @@ import Servant
   , Headers
   , Server
   , ServerError (..)
+  , ServerT
   , addHeader
   , err303
   , err404
   , err422
   , err500
   , err503
+  , hoistServer
   , throwError
   , serveDirectoryWebApp
   )
@@ -75,6 +82,13 @@ data MixtapeStore = MixtapeStore
   { storeCreateMixtape :: Mixtape -> IO (Either StoreError StoredMixtape)
   , storeGetMixtape :: MixtapeId -> IO (Either StoreError (Maybe StoredMixtape))
   }
+
+data AppEnv = AppEnv
+  { envStore     :: MixtapeStore
+  , envStaticDir :: FilePath
+  }
+
+type AppM = ReaderT AppEnv Handler
 
 postgresMixtapeStore :: Pool.Pool -> MixtapeStore
 postgresMixtapeStore pool = MixtapeStore
@@ -113,7 +127,8 @@ appForStoreAt :: MixtapeStore -> FilePath -> Application
 appForStoreAt store directory =
   securityHeadersMiddleware (bodySizeLimit (1024 * 1024) (cacheControlMiddleware app))
   where
-    app = serve appApi (server store directory)
+    env = AppEnv { envStore = store, envStaticDir = directory }
+    app = serve appApi (server env)
     csp = "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com; style-src 'self' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://i.ytimg.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com; connect-src 'self' https://www.youtube.com"
     securityHeaders =
       [ ("Content-Security-Policy", csp)
@@ -156,24 +171,30 @@ bodySizeLimit limit app request respond
           then pure Nothing
           else collect (size + BS.length chunk) (chunk : chunks)
 
-server :: MixtapeStore -> FilePath -> Server AppApi
-server store staticDirectory = healthHandler :<|> (createMixtapeHandler store :<|> getMixtapeHandler store) :<|>
-  (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler store) :<|> (createdPageHandler store :<|> getSharedMixtapeHandler store))) :<|>
-  serveDirectoryWebApp staticDirectory
+server :: AppEnv -> Server AppApi
+server env = hoistServer appApi (`runReaderT` env) (serverT env.envStaticDir)
+
+serverT :: FilePath -> ServerT AppApi AppM
+serverT staticDirectory =
+  lift healthHandler
+    :<|> (createMixtapeHandler :<|> getMixtapeHandler)
+    :<|> (pageHandler :<|> ((createPageHandler :<|> submitCreateFormHandler) :<|> (createdPageHandler :<|> getSharedMixtapeHandler)))
+    :<|> serveDirectoryWebApp staticDirectory
 
 healthHandler :: Handler String
 healthHandler = return "https://www.youtube.com/watch?v=_rVvjslF6M8"
 
-pageHandler :: Handler (Html ())
+pageHandler :: AppM (Html ())
 pageHandler = pure renderLandingPage
 
-createPageHandler :: Handler (Html ())
+createPageHandler :: AppM (Html ())
 createPageHandler = pure (renderCreatePage Nothing Nothing)
 
-submitCreateFormHandler :: MixtapeStore -> CreateMixtapeForm -> Handler (Html ())
-submitCreateFormHandler store form = case createMixtapeFromForm form of
+submitCreateFormHandler :: CreateMixtapeForm -> AppM (Html ())
+submitCreateFormHandler form = case createMixtapeFromForm form of
   Left validationError -> throwError (htmlError err422 (renderCreatePage (Just validationError) (Just form)))
   Right mixtape -> do
+    store <- asks (.envStore)
     result <- liftIO (storeCreateMixtape store mixtape)
     case result of
       Left storeError ->
@@ -191,8 +212,9 @@ submitCreateFormHandler store form = case createMixtapeFromForm form of
               ]
           }
 
-createdPageHandler :: MixtapeStore -> ShareCode -> Handler (Html ())
-createdPageHandler store shareCode = do
+createdPageHandler :: ShareCode -> AppM (Html ())
+createdPageHandler shareCode = do
+  store <- asks (.envStore)
   result <- liftIO (storeGetMixtape store (mixtapeIdFromShareCode shareCode))
   case result of
     Left storeError -> throwError (htmlStoreErrorResponse storeError)
@@ -200,10 +222,10 @@ createdPageHandler store shareCode = do
     Right (Just mixtape) -> pure (renderCreatedPage mixtape)
 
 createMixtapeHandler
-  :: MixtapeStore
-  -> Mixtape
-  -> Handler (Headers '[Header "Location" Text] StoredMixtape)
-createMixtapeHandler store mixtape = do
+  :: Mixtape
+  -> AppM (Headers '[Header "Location" Text] StoredMixtape)
+createMixtapeHandler mixtape = do
+  store <- asks (.envStore)
   result <- liftIO (storeCreateMixtape store mixtape)
   case result of
     Left storeError -> do
@@ -212,8 +234,9 @@ createMixtapeHandler store mixtape = do
       ("/m/" <> toUrlPiece (shareCodeFor created.mixtapeId))
       created
 
-getMixtapeHandler :: MixtapeStore -> MixtapeId -> Handler StoredMixtape
-getMixtapeHandler store tapeId = do
+getMixtapeHandler :: MixtapeId -> AppM StoredMixtape
+getMixtapeHandler tapeId = do
+  store <- asks (.envStore)
   result <- liftIO (storeGetMixtape store tapeId)
   case result of
     Left storeError -> do
@@ -221,8 +244,9 @@ getMixtapeHandler store tapeId = do
     Right Nothing -> throwError err404
     Right (Just mixtape) -> pure mixtape
 
-getSharedMixtapeHandler :: MixtapeStore -> ShareCode -> Handler (Html ())
-getSharedMixtapeHandler store shareCode = do
+getSharedMixtapeHandler :: ShareCode -> AppM (Html ())
+getSharedMixtapeHandler shareCode = do
+  store <- asks (.envStore)
   result <- liftIO (storeGetMixtape store (mixtapeIdFromShareCode shareCode))
   case result of
     Left storeError -> throwError (htmlStoreErrorResponse storeError)

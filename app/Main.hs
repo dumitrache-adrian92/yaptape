@@ -1,8 +1,11 @@
 module Main (main) where
 
-import Yaptape (runWithStatic)
+import Yaptape (runWithPaths)
 import Paths_yaptape (getDataFileName)
 import System.FilePath ((</>))
 
 main :: IO ()
-main = getDataFileName ("static" </> "") >>= runWithStatic
+main = do
+  staticDir <- getDataFileName ("static" </> "")
+  migrationsDir <- getDataFileName ("db" </> "migrations" </> "")
+  runWithPaths staticDir migrationsDir

@@ -9,11 +9,12 @@ module Yaptape.Db.Postgres
   , createPoolFromConfig
   , runMigrations
   , runMigrationsFrom
+  , getAppliedMigrations
   , createMixtape
   , getMixtape
   ) where
 
-import Control.Monad (forM_)
+import Control.Monad (forM_, unless)
 import qualified Data.ByteString as BS
 import Data.Functor.Contravariant ((>$<))
 import qualified Data.List as List
@@ -94,17 +95,52 @@ createPoolFromConfig cfg = do
         ]
   Pool.acquire config
 
--- | Run all @.sql@ migrations from the default @db/migrations@ directory.
+-- | Run all @.sql@ migrations from the configured @MIGRATIONS_DIR@ or default @db/migrations@ directory.
 runMigrations :: Pool.Pool -> IO (Either Pool.UsageError ())
-runMigrations pool = runMigrationsFrom pool "db/migrations"
+runMigrations pool = do
+  migDir <- fromMaybe "db/migrations" <$> lookupEnv "MIGRATIONS_DIR"
+  runMigrationsFrom pool migDir
 
--- | Run all @.sql@ files in lexicographical order from the given directory.
+-- | Run all unapplied @.sql@ files in lexicographical order from the given directory,
+-- tracking applied versions in the @schema_migrations@ table under a transaction advisory lock.
 runMigrationsFrom :: Pool.Pool -> FilePath -> IO (Either Pool.UsageError ())
 runMigrationsFrom pool migrationsDir = do
   entries <- listDirectory migrationsDir
-  let sqlFiles = List.sort [migrationsDir </> f | f <- entries, takeExtension f == ".sql"]
-  scripts <- traverse BS.readFile sqlFiles
-  Pool.use pool (forM_ scripts Session.sql)
+  let sqlFileNames = List.sort [f | f <- entries, takeExtension f == ".sql"]
+  scripts <- traverse (\f -> do
+    bytes <- BS.readFile (migrationsDir </> f)
+    pure (T.pack f, bytes)) sqlFileNames
+  Pool.use pool $ do
+    Session.sql "BEGIN"
+    Session.sql "SELECT pg_advisory_xact_lock(89278273)"
+    Session.sql
+      "CREATE TABLE IF NOT EXISTS schema_migrations (\
+      \  version text PRIMARY KEY,\
+      \  applied_at timestamptz NOT NULL DEFAULT now()\
+      \)"
+    applied <- Session.statement () selectAppliedMigrations
+    forM_ scripts $ \(version, scriptBytes) ->
+      unless (version `elem` applied) $ do
+        Session.sql scriptBytes
+        Session.statement version insertAppliedMigration
+    Session.sql "COMMIT"
+
+-- | Return all applied migration filenames ordered lexicographically.
+getAppliedMigrations :: Pool.Pool -> IO (Either Pool.UsageError [Text])
+getAppliedMigrations pool =
+  Pool.use pool (Session.statement () selectAppliedMigrations)
+
+selectAppliedMigrations :: Statement.Statement () [Text]
+selectAppliedMigrations = Statement.Statement sql Encoders.noParams decoder True
+  where
+    sql = "SELECT version FROM schema_migrations ORDER BY version"
+    decoder = Decoders.rowList (Decoders.column (Decoders.nonNullable Decoders.text))
+
+insertAppliedMigration :: Statement.Statement Text ()
+insertAppliedMigration = Statement.Statement sql encoder Decoders.noResult True
+  where
+    sql = "INSERT INTO schema_migrations (version) VALUES ($1)"
+    encoder = Encoders.param (Encoders.nonNullable Encoders.text)
 
 createMixtape :: Pool.Pool -> Mixtape -> IO (Either Pool.UsageError StoredMixtape)
 createMixtape pool mixtape = Pool.use pool $ Transactions.transaction

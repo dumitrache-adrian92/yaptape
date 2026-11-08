@@ -1,0 +1,7 @@
+.git
+.stack-work
+.vscode
+node_modules
+playwright-report
+test-results
+.env

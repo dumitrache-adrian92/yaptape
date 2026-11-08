@@ -48,3 +48,48 @@ test('create form manages tracks and looks up valid YouTube titles', async ({ pa
   await expect(page.getByRole('heading', { name: 'Road trip songs' })).toBeVisible();
   await expect(page.getByText('A song for the long way home')).toBeVisible();
 });
+
+test('mixtape player switches tracks via transport controls, queue items, and keyboard shortcuts', async ({ page }) => {
+  await page.route('https://www.youtube.com/oembed**', route => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ title: '' }),
+  }));
+
+  await page.goto('/create');
+  await page.getByRole('button', { name: '+ Add a track' }).click();
+
+  const trackRows = page.locator('#track-list > .track-row');
+  await trackRows.nth(0).locator('.video-url').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  await trackRows.nth(0).locator('.track-title').fill('Track One');
+  await trackRows.nth(0).locator('.track-note').fill('Opening track note');
+
+  await trackRows.nth(1).locator('.video-url').fill('https://www.youtube.com/watch?v=M7lc1UVf-VE');
+  await trackRows.nth(1).locator('.track-title').fill('Track Two');
+  await trackRows.nth(1).locator('.track-note').fill('Closing track note');
+
+  await page.locator('#tape-title').fill('Two Track Tape');
+  await page.getByRole('button', { name: 'Create mixtape' }).click();
+  await page.getByRole('link', { name: 'Preview your mixtape' }).click();
+
+  await expect(page.locator('#current-track-title')).toHaveText('Track One');
+  await expect(page.locator('#current-track-note')).toHaveText('Opening track note');
+  await expect(page.locator('#current-track-counter')).toHaveText('1 / 2');
+  await expect(page.locator('#previous-track')).toBeDisabled();
+  await expect(page.locator('#next-track')).toBeEnabled();
+
+  await page.locator('#next-track').click();
+  await expect(page.locator('#current-track-title')).toHaveText('Track Two');
+  await expect(page.locator('#current-track-note')).toHaveText('Closing track note');
+  await expect(page.locator('#current-track-counter')).toHaveText('2 / 2');
+  await expect(page.locator('#previous-track')).toBeEnabled();
+  await expect(page.locator('#next-track')).toBeDisabled();
+
+  await page.keyboard.press('ArrowLeft');
+  await expect(page.locator('#current-track-title')).toHaveText('Track One');
+  await expect(page.locator('#current-track-counter')).toHaveText('1 / 2');
+
+  await page.locator('#track-queue [data-track-index="1"]').click();
+  await expect(page.locator('#current-track-title')).toHaveText('Track Two');
+  await expect(page.locator('#current-track-counter')).toHaveText('2 / 2');
+});

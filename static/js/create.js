@@ -80,10 +80,10 @@ document.addEventListener('change',function(event) {
   if(id)lookupTitle(event.target,id)
 }
 );
-const createForm=document.querySelector('form[action="/create"]');
-const trackList=document.querySelector('#track-list');
-createForm.addEventListener('submit',function(event) {
-  const inputs=Array.from(createForm.querySelectorAll('.video-url'));
+document.addEventListener('submit',function(event) {
+  if(!event.target.matches('form[action="/create"]'))return;
+  const form=event.target;
+  const inputs=Array.from(form.querySelectorAll('.video-url'));
   const requests=[];
   for(const input of inputs) {
     const id=youtubeVideoId(input.value);
@@ -93,17 +93,18 @@ createForm.addEventListener('submit',function(event) {
   if(requests.length) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    Promise.all(requests).then(()=>createForm.requestSubmit(event.submitter))
+    Promise.all(requests).then(()=>form.requestSubmit(event.submitter))
   }
   
 }
 ,true);
 document.addEventListener('click',function(event) {
   if(!(event.target instanceof Element))return;
+  const currentTrackList=document.querySelector('#track-list');
   const add=event.target.closest('#add-track');
-  if(add) {
+  if(add&&currentTrackList) {
     const row=document.querySelector('#track-template').content.firstElementChild.cloneNode(true);
-    trackList.append(row);
+    currentTrackList.append(row);
     row.querySelector('input').focus();
     return
   }
@@ -120,9 +121,15 @@ document.addEventListener('click',function(event) {
     event.stopPropagation();
 
     const row=remove.closest('.track-row');
-    if(!trackList||!row||row.parentElement!==trackList)return;
+    if(!currentTrackList||!row||row.parentElement!==currentTrackList)return;
 
-    trackList.removeChild(row)
+    if(currentTrackList.querySelectorAll('.track-row').length<=1) {
+      const freshRow=document.querySelector('#track-template').content.firstElementChild.cloneNode(true);
+      currentTrackList.replaceChild(freshRow,row);
+      freshRow.querySelector('input').focus();
+      return
+    }
+    currentTrackList.removeChild(row)
   }
   
 }
@@ -135,6 +142,9 @@ document.body.addEventListener('htmx:beforeSwap',function(evt) {
 }
 );
 document.body.addEventListener('htmx:responseError',function() {
-  document.querySelector('#create-flow').insertAdjacentHTML('afterbegin','<p class=error role=alert>We could not save this mixtape. Please try again.</p>')
+  const flow=document.querySelector('#create-flow');
+  if(!flow)return;
+  flow.querySelectorAll(':scope > .error').forEach(el=>el.remove());
+  flow.insertAdjacentHTML('afterbegin','<p class=error role=alert>We could not save this mixtape. Please try again.</p>')
 }
 );

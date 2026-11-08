@@ -70,6 +70,7 @@ tests:
       - http-client
       - http-types
       - text
+      - bytestring
       - time
       - process
       - hasql

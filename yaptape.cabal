@@ -116,6 +116,7 @@ test-suite yaptape-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
+      Integration.DbSpec
       Integration.HealthSpec
       Integration.MixtapeSpec
       Integration.TestDb

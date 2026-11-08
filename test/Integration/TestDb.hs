@@ -2,7 +2,9 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
 module Integration.TestDb
-  ( withTestApp
+  ( TestEnv (..)
+  , withTestApp
+  , withTestEnv
   ) where
 
 import Control.Concurrent (threadDelay)
@@ -12,21 +14,37 @@ import Data.Word (Word16)
 import Network.Wai (Application)
 import System.Process (readProcess)
 import Text.Read (readMaybe)
-import Yaptape (withAppForDb)
-import Yaptape.Db.Postgres (DbConfig (..))
+import Yaptape.Db.Postgres (DbConfig (..), createPoolFromConfig, runMigrations)
+import Yaptape.Server (appForStore, postgresMixtapeStore)
 import qualified Hasql.Connection as Connection
 import Hasql.Connection.Setting (connection)
 import Hasql.Connection.Setting.Connection (params)
 import qualified Hasql.Connection.Setting.Connection.Param as Param
+import qualified Hasql.Pool as Pool
+
+data TestEnv = TestEnv
+  { testApp  :: Application
+  , testPool :: Pool.Pool
+  }
 
 -- | Spin up an ephemeral @postgres:16@ Docker container in RAM (@--tmpfs@)
 -- bound to a random localhost port, wait for readiness and apply migrations,
--- run the test action with a configured 'Application', and remove the container.
-withTestApp :: (Application -> IO a) -> IO a
-withTestApp action =
+-- run the test action with a configured 'TestEnv', and remove the container.
+withTestEnv :: (TestEnv -> IO a) -> IO a
+withTestEnv action =
   bracket startPostgresContainer stopPostgresContainer $ \(_, dbCfg) -> do
     waitForPostgres dbCfg 50
-    withAppForDb dbCfg action
+    bracket (createPoolFromConfig dbCfg) Pool.release $ \pool -> do
+      migResult <- runMigrations pool
+      case migResult of
+        Left err -> ioError (userError ("Database migration failed: " ++ show err))
+        Right () -> action TestEnv
+          { testApp = appForStore (postgresMixtapeStore pool)
+          , testPool = pool
+          }
+
+withTestApp :: (Application -> IO a) -> IO a
+withTestApp action = withTestEnv (\env -> action env.testApp)
 
 startPostgresContainer :: IO (String, DbConfig)
 startPostgresContainer = do

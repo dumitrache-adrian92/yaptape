@@ -7,11 +7,16 @@ module Yaptape.Db.Postgres
   , resolveDbConfig
   , createPool
   , createPoolFromConfig
+  , runMigrations
+  , runMigrationsFrom
   , createMixtape
   , getMixtape
   ) where
 
+import Control.Monad (forM_)
+import qualified Data.ByteString as BS
 import Data.Functor.Contravariant ((>$<))
+import qualified Data.List as List
 import Data.Maybe (fromMaybe, mapMaybe)
 import Data.Text (Text)
 import qualified Data.Text as T
@@ -25,10 +30,13 @@ import qualified Hasql.Decoders as Decoders
 import qualified Hasql.Encoders as Encoders
 import qualified Hasql.Pool as Pool
 import qualified Hasql.Pool.Config as PoolConfig
+import qualified Hasql.Session as Session
 import qualified Hasql.Statement as Statement
 import qualified Hasql.Transaction as Transaction
 import qualified Hasql.Transaction.Sessions as Transactions
+import System.Directory (listDirectory)
 import System.Environment (lookupEnv)
+import System.FilePath (takeExtension, (</>))
 import Text.Read (readMaybe)
 import Yaptape.Db.Schema (MixtapeRow (..), TrackBatchParams, TrackRow (..), fromDbRows, toTrackBatchParams)
 import Yaptape.Domain
@@ -85,6 +93,18 @@ createPoolFromConfig cfg = do
         , PoolConfig.staticConnectionSettings [connectionSettings]
         ]
   Pool.acquire config
+
+-- | Run all @.sql@ migrations from the default @db/migrations@ directory.
+runMigrations :: Pool.Pool -> IO (Either Pool.UsageError ())
+runMigrations pool = runMigrationsFrom pool "db/migrations"
+
+-- | Run all @.sql@ files in lexicographical order from the given directory.
+runMigrationsFrom :: Pool.Pool -> FilePath -> IO (Either Pool.UsageError ())
+runMigrationsFrom pool migrationsDir = do
+  entries <- listDirectory migrationsDir
+  let sqlFiles = List.sort [migrationsDir </> f | f <- entries, takeExtension f == ".sql"]
+  scripts <- traverse BS.readFile sqlFiles
+  Pool.use pool (forM_ scripts Session.sql)
 
 createMixtape :: Pool.Pool -> Mixtape -> IO (Either Pool.UsageError StoredMixtape)
 createMixtape pool mixtape = Pool.use pool $ Transactions.transaction

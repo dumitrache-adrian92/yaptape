@@ -6,6 +6,7 @@
 module Integration.MixtapeSpec (spec) where
 
 import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Network.Wai (Application)
 import Network.Wai.Handler.Warp (testWithApplication)
 import Servant.Client
   ( BaseUrl (..)
@@ -18,7 +19,6 @@ import Servant.Client
 import Test.Hspec
 import Data.Text (Text)
 import Servant.API (Header, Headers, getResponse)
-import Yaptape (withApp)
 import Yaptape.Api (getMixtapeApi, mixtapeApi)
 import Yaptape.Domain
   ( Mixtape (..)
@@ -38,16 +38,16 @@ postMixtape = client mixtapeApi
 getMixtape :: MixtapeId -> ClientM StoredMixtape
 getMixtape = client getMixtapeApi
 
-spec :: Spec
+spec :: SpecWith Application
 spec = describe "POST /mixtape (Integration)" $ do
-  it "persists a mixtape and its tracks and returns generated identifiers" $ do
+  it "persists a mixtape and its tracks and returns generated identifiers" $ \app -> do
     let youtubeVideo = either (error . show) id (mkYouTubeVideoId "dQw4w9WgXcQ")
         mixtape = Mixtape
           { title = "Integration tape"
           , description = Just "Created by the API integration test"
           , tracks = [Track youtubeVideo (Just "Track title") (Just "Artist") "A note"]
           }
-    withApp $ \app -> testWithApplication (pure app) $ \port -> do
+    testWithApplication (pure app) $ \port -> do
       manager <- newManager defaultManagerSettings
       let env = mkClientEnv manager (BaseUrl Http "localhost" port "")
       result <- runClientM (postMixtape mixtape) env

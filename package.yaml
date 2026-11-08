@@ -18,6 +18,7 @@ extra-source-files:
 - static/js/playback.js
 
 data-files:
+- db/migrations/*.sql
 - static/css/app.css
 - static/favicon.svg
 - static/js/*.js
@@ -69,9 +70,12 @@ tests:
       - http-types
       - text
       - time
+      - process
+      - hasql
 
 dependencies:
 - base
+- directory
 - filepath
 - servant
 - servant-server

@@ -25,6 +25,8 @@ extra-source-files:
     static/js/HTMX-LICENSE.txt
     static/js/playback.js
 data-files:
+    db/migrations/001_create_mixtapes.sql
+    db/migrations/002_add_field_limits.sql
     static/css/app.css
     static/favicon.svg
     static/js/copy-link.js
@@ -55,6 +57,7 @@ library
     , base
     , base64-bytestring
     , bytestring
+    , directory
     , filepath
     , hasql
     , hasql-pool
@@ -88,6 +91,7 @@ executable yaptape-exe
     , base
     , base64-bytestring
     , bytestring
+    , directory
     , filepath
     , hasql
     , hasql-pool
@@ -114,6 +118,7 @@ test-suite yaptape-test
   other-modules:
       Integration.HealthSpec
       Integration.MixtapeSpec
+      Integration.TestDb
       Unit.ApiSpec
       Unit.DbSpec
       Unit.HealthSpec
@@ -129,6 +134,7 @@ test-suite yaptape-test
     , base
     , base64-bytestring
     , bytestring
+    , directory
     , filepath
     , hasql
     , hasql-pool
@@ -139,6 +145,7 @@ test-suite yaptape-test
     , http-types
     , lucid
     , network-uri
+    , process
     , servant
     , servant-client
     , servant-lucid

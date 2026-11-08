@@ -17,7 +17,3 @@ database_exists=$(docker compose exec -T db psql -U yaptape -d postgres -tAc "SE
 if [[ "$database_exists" != "1" ]]; then
   docker compose exec -T db createdb -U yaptape "$DATABASE_NAME"
 fi
-
-for migration in db/migrations/*.sql; do
-  docker compose exec -T db psql -v ON_ERROR_STOP=1 -U yaptape -d "$DATABASE_NAME" < "$migration"
-done

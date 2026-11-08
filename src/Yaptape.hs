@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedRecordDot #-}
 
-module Yaptape (run, runWithStatic, withApp) where
+module Yaptape (run, runWithStatic, withApp, withAppForDb) where
 
 import Network.Wai (Application)
 import Network.Wai.Handler.Warp
@@ -16,7 +16,7 @@ import System.Environment (lookupEnv)
 import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
 
-import Yaptape.Db.Postgres (DbConfig, createPoolFromConfig, resolveDbConfig)
+import Yaptape.Db.Postgres (DbConfig, createPoolFromConfig, resolveDbConfig, runMigrations)
 import Yaptape.Server (appForStore, appForStoreAt, postgresMixtapeStore)
 import qualified Hasql.Pool as Pool
 
@@ -52,6 +52,13 @@ parsePort (Just raw) = case readMaybe raw of
     | n > 0 && n <= 65535 -> Right n
     | otherwise           -> Left "PORT must be between 1 and 65535"
 
+ensureMigrations :: Pool.Pool -> IO ()
+ensureMigrations pool = do
+  migResult <- runMigrations pool
+  case migResult of
+    Left err -> ioError (userError ("Database migration failed: " ++ show err))
+    Right () -> pure ()
+
 runWithStatic :: FilePath -> IO ()
 runWithStatic bundledStatic = do
   cfg <- resolveConfig bundledStatic
@@ -59,10 +66,17 @@ runWithStatic bundledStatic = do
         setPort cfg.cfgPort $
         setBeforeMainLoop (hPutStrLn stderr ("listening on port " ++ show cfg.cfgPort)) $
         defaultSettings
-  withPool cfg.cfgDb $ \pool ->
+  withPool cfg.cfgDb $ \pool -> do
+    ensureMigrations pool
     runSettings settings (appForStoreAt (postgresMixtapeStore pool) cfg.cfgStaticDir)
 
 withApp :: (Application -> IO a) -> IO a
 withApp action = do
   dbCfg <- resolveDbConfig
-  withPool dbCfg (action . appForStore . postgresMixtapeStore)
+  withAppForDb dbCfg action
+
+withAppForDb :: DbConfig -> (Application -> IO a) -> IO a
+withAppForDb dbCfg action =
+  withPool dbCfg $ \pool -> do
+    ensureMigrations pool
+    action (appForStore (postgresMixtapeStore pool))

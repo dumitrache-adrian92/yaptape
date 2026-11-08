@@ -7,12 +7,16 @@ import Network.Wai.Handler.Warp
   ( defaultSettings
   , runSettings
   , setBeforeMainLoop
+  , setGracefulShutdownTimeout
+  , setInstallShutdownHandler
   , setPort
   , Port
   )
 import Control.Exception (bracket)
+import Control.Monad (void)
 import System.IO (hPutStrLn, stderr)
 import System.Environment (lookupEnv)
+import System.Posix.Signals (Handler (Catch), installHandler, sigINT, sigTERM)
 import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
 
@@ -77,8 +81,13 @@ runWithPaths :: FilePath -> FilePath -> IO ()
 runWithPaths bundledStatic bundledMigrations = do
   cfg <- resolveConfig bundledStatic bundledMigrations
   configureAssetVersion cfg.cfgStaticDir
-  let settings =
+  let installShutdown closeSocket = do
+        void $ installHandler sigTERM (Catch closeSocket) Nothing
+        void $ installHandler sigINT (Catch closeSocket) Nothing
+      settings =
         setPort cfg.cfgPort $
+        setGracefulShutdownTimeout (Just 10) $
+        setInstallShutdownHandler installShutdown $
         setBeforeMainLoop (hPutStrLn stderr ("listening on port " ++ show cfg.cfgPort)) $
         defaultSettings
   withPool cfg.cfgDb $ \pool -> do

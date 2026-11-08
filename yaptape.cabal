@@ -75,6 +75,7 @@ library
     , text
     , time
     , transformers
+    , unix
     , uuid
     , wai
     , warp
@@ -109,6 +110,7 @@ executable yaptape-exe
     , text
     , time
     , transformers
+    , unix
     , uuid
     , wai
     , warp
@@ -158,6 +160,7 @@ test-suite yaptape-test
     , text
     , time
     , transformers
+    , unix
     , uuid
     , wai
     , warp >=3.2.4

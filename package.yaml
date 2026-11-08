@@ -99,3 +99,4 @@ dependencies:
 - hasql-transaction
 - uuid
 - base64-bytestring
+- unix

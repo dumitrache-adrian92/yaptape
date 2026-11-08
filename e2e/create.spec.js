@@ -17,7 +17,6 @@ test('create form manages tracks and looks up valid YouTube titles', async ({ pa
 
   const firstRow = trackRows.nth(0);
   const secondRow = trackRows.nth(1);
-  await firstRow.locator('.track-title').fill('First song');
   await secondRow.locator('.track-title').fill('Second song');
 
   await firstRow.locator('.video-url').fill('https://example.com/video');

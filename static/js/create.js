@@ -25,7 +25,7 @@ function lookupTitle(input,id) {
   const row=input.closest('.track-row'),titleField=row.querySelector('.track-title'),hint=row.querySelector('.url-hint'),version=Number(input.dataset.lookupVersion||0)+1;
   input.dataset.lookupVersion=String(version);
   input.dataset.lookupUrl=input.value;
-  titleField.value='';
+  if(titleField.value===titleField.dataset.autoFilled)titleField.value='';
   hint.textContent='Looking up YouTube title…';
   const endpoint=new URL('https://www.youtube.com/oembed');
   endpoint.searchParams.set('url','https://www.youtube.com/watch?v='+id);
@@ -40,7 +40,11 @@ function lookupTitle(input,id) {
   ).then(data=> {
     if(Number(input.dataset.lookupVersion)!==version)return;
     if(typeof data.title==='string'&&data.title.trim()) {
-      titleField.value=data.title.trim();
+      const fetchedTitle=data.title.trim();
+      if(!titleField.value.trim()||titleField.value===titleField.dataset.autoFilled) {
+        titleField.value=fetchedTitle;
+        titleField.dataset.autoFilled=fetchedTitle
+      }
       hint.textContent='YouTube title found. You can edit it.'
     }
     else {
@@ -63,7 +67,7 @@ document.addEventListener('input',function(event) {
   const input=event.target,row=input.closest('.track-row'),titleField=row.querySelector('.track-title'),hint=row.querySelector('.url-hint');
   if(input.value!==input.dataset.lookupUrl) {
     input.dataset.lookupVersion=String(Number(input.dataset.lookupVersion||0)+1);
-    titleField.value=''
+    if(titleField.value===titleField.dataset.autoFilled)titleField.value=''
   }
   hint.textContent=input.value?(youtubeVideoId(input.value)?'YouTube link looks good.':'Use a youtube.com or youtu.be video link.'):'YouTube links from youtube.com or youtu.be';
   hint.classList.toggle('url-valid',Boolean(input.value&&youtubeVideoId(input.value)));
@@ -88,11 +92,12 @@ createForm.addEventListener('submit',function(event) {
   requests.push(...pendingTitleLookups.values());
   if(requests.length) {
     event.preventDefault();
+    event.stopImmediatePropagation();
     Promise.all(requests).then(()=>createForm.requestSubmit(event.submitter))
   }
   
 }
-);
+,true);
 document.addEventListener('click',function(event) {
   if(!(event.target instanceof Element))return;
   const add=event.target.closest('#add-track');

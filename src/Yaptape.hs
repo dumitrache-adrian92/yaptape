@@ -17,7 +17,7 @@ import Text.Read (readMaybe)
 import Data.Maybe (fromMaybe)
 
 import Yaptape.Db.Postgres (DbConfig, createPoolFromConfig, resolveDbConfig, runMigrations, runMigrationsFrom)
-import Yaptape.Server (appForStore, appForStoreAt, postgresMixtapeStore)
+import Yaptape.Server (appForStore, appForStoreWithLogger, defaultStderrLogger, postgresMixtapeStore)
 import qualified Hasql.Pool as Pool
 
 run :: IO ()
@@ -81,7 +81,7 @@ runWithPaths bundledStatic bundledMigrations = do
         defaultSettings
   withPool cfg.cfgDb $ \pool -> do
     ensureMigrationsFrom pool cfg.cfgMigrationsDir
-    runSettings settings (appForStoreAt (postgresMixtapeStore pool) cfg.cfgStaticDir)
+    runSettings settings (appForStoreWithLogger defaultStderrLogger (postgresMixtapeStore pool) cfg.cfgStaticDir)
 
 withApp :: (Application -> IO a) -> IO a
 withApp action = do

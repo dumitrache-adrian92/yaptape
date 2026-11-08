@@ -5,6 +5,7 @@
 
 module Unit.ApiSpec (spec) where
 
+import Data.IORef (modifyIORef', newIORef, readIORef)
 import Data.Time (UTCTime (..), fromGregorian)
 import Data.List (isPrefixOf, tails)
 import Data.Text (Text)
@@ -45,7 +46,7 @@ import Yaptape.Domain
   )
 import Servant.API (ToHttpApiData (toUrlPiece))
 import Servant.API (FromHttpApiData (parseUrlPiece))
-import Yaptape.Server (MixtapeStore (..), StoreError (..), appForStore)
+import Yaptape.Server (LogEntry (..), LogLevel (..), MixtapeStore (..), StoreError (..), appForStore, appForStoreWithLogger)
 import Yaptape.Form (CreateMixtapeForm (..), createMixtapeFromForm)
 import Yaptape.Pages (assetVersion, computeAssetVersion)
 import Yaptape.YouTube (mkYouTubeVideoId)
@@ -319,6 +320,33 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       statusCode (responseStatus apiResp) `shouldBe` 500
       lookup "Content-Type" (responseHeaders apiResp) `shouldBe` Just "application/json"
       BL8.unpack (responseBody apiResp) `shouldContain` "internal_error"
+
+  it "emits structured log entries with levels and request metadata" $ do
+    logsRef <- newIORef ([] :: [LogEntry])
+    let recordLog entry = modifyIORef' logsRef (entry :)
+        failingStore = MixtapeStore
+          { storeCreateMixtape = \_ -> pure (Left StoreFailure)
+          , storeGetMixtape = \_ -> pure (Left StoreFailure)
+          }
+        loggedApp = appForStoreWithLogger recordLog failingStore "static"
+    testWithApplication (pure loggedApp) $ \port -> do
+      manager <- newManager defaultManagerSettings
+      healthReq <- parseRequest ("http://localhost:" <> show port <> "/health")
+      _ <- httpLbs healthReq manager
+      sampleId <- maybe (fail "bad uuid") pure (mkMixtapeId "00000000-0000-4000-8000-000000000001")
+      errReq <- parseRequest ("http://localhost:" <> show port <> "/api/mixtapes/" <> T.unpack (toUrlPiece sampleId))
+      _ <- httpLbs errReq manager
+      entries <- reverse <$> readIORef logsRef
+      case entries of
+        [e1, e2] -> do
+          e1.logLevel `shouldBe` LogInfo
+          e1.logEvent `shouldBe` "http_request"
+          T.unpack e1.logMessage `shouldContain` "GET /health 200"
+
+          e2.logLevel `shouldBe` LogError
+          e2.logEvent `shouldBe` "http_request"
+          T.unpack e2.logMessage `shouldContain` "500"
+        other -> expectationFailure ("Expected 2 structured log entries, got: " ++ show other)
 
 requiredMaybe :: Maybe a -> a
 requiredMaybe = maybe (error "invalid UUID fixture") id

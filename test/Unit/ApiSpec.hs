@@ -160,7 +160,7 @@ spec = describe "Mixtape routes with an in-memory store" $ do
       createResponse <- httpLbs createRequest manager
       statusCode (responseStatus createResponse) `shouldBe` 200
       BL8.unpack (responseBody createResponse) `shouldContain` "YouTube video link"
-      BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js"
+      BL8.unpack (responseBody createResponse) `shouldContain` "/assets/js/create.js?v=3"
       BL8.unpack (responseBody createResponse) `shouldContain` "Track title (e.g. Artist - Song, or filled from YouTube)"
       countOccurrences "data-remove" (BL8.unpack (responseBody createResponse)) `shouldBe` 2
       createScriptRequest <- parseRequest ("http://localhost:" <> show port <> "/assets/js/create.js")

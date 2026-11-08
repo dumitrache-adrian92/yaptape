@@ -27,6 +27,14 @@ module Yaptape.Domain
   , Mixtape (..)
   , mkMixtape
   , StoredMixtape (..)
+
+    -- * Domain Validation Limits
+  , maxMixtapeTitleLength
+  , maxMixtapeDescriptionLength
+  , maxMixtapeTracks
+  , maxTrackTitleLength
+  , maxTrackArtistLength
+  , maxTrackNoteLength
   ) where
 
 import qualified Data.ByteString.Base64.URL as Base64Url
@@ -124,6 +132,30 @@ instance ToHttpApiData TrackId where
 instance FromHttpApiData TrackId where
   parseUrlPiece = maybe (Left "expected a UUID") Right . mkTrackId
 
+-- | Maximum allowed character length for a mixtape title.
+maxMixtapeTitleLength :: Int
+maxMixtapeTitleLength = 120
+
+-- | Maximum allowed character length for a mixtape description.
+maxMixtapeDescriptionLength :: Int
+maxMixtapeDescriptionLength = 500
+
+-- | Maximum number of tracks allowed in a single mixtape.
+maxMixtapeTracks :: Int
+maxMixtapeTracks = 100
+
+-- | Maximum allowed character length for a track title.
+maxTrackTitleLength :: Int
+maxTrackTitleLength = 300
+
+-- | Maximum allowed character length for a track artist name.
+maxTrackArtistLength :: Int
+maxTrackArtistLength = 200
+
+-- | Maximum allowed character length for a track note.
+maxTrackNoteLength :: Int
+maxTrackNoteLength = 2000
+
 -- | A track within a mixtape as received from the client for creation.
 data Track = Track
   { videoId :: YouTubeVideoId
@@ -137,9 +169,9 @@ data Track = Track
 mkTrack :: YouTubeVideoId -> Maybe Text -> Maybe Text -> Text -> Either Text Track
 mkTrack video trackTitle performer trackNote
   | T.null strippedNote = Left "Add a note for every track."
-  | T.length strippedNote > 2000 = Left "Keep each note under 2000 characters."
-  | exceedsLimit 300 trackTitle = Left "Keep each track title under 300 characters."
-  | exceedsLimit 200 performer = Left "Keep each artist name under 200 characters."
+  | T.length strippedNote > maxTrackNoteLength = Left "Keep each note under 2000 characters."
+  | exceedsLimit maxTrackTitleLength trackTitle = Left "Keep each track title under 300 characters."
+  | exceedsLimit maxTrackArtistLength performer = Left "Keep each artist name under 200 characters."
   | otherwise = Right (Track video (stripNonEmpty trackTitle) (stripNonEmpty performer) strippedNote)
   where
     strippedNote = T.strip trackNote
@@ -174,10 +206,10 @@ data Mixtape = Mixtape
 mkMixtape :: Text -> Maybe Text -> [Track] -> Either Text Mixtape
 mkMixtape tapeTitle tapeDescription tapeTracks
   | T.null strippedTitle = Left "Give your mixtape a title."
-  | T.length strippedTitle > 120 = Left "Keep your mixtape title under 120 characters."
+  | T.length strippedTitle > maxMixtapeTitleLength = Left "Keep your mixtape title under 120 characters."
   | null tapeTracks = Left "Add at least one track."
-  | length tapeTracks > 100 = Left "A mixtape can have at most 100 tracks."
-  | exceedsLimit 500 tapeDescription = Left "Keep the description under 500 characters."
+  | length tapeTracks > maxMixtapeTracks = Left "A mixtape can have at most 100 tracks."
+  | exceedsLimit maxMixtapeDescriptionLength tapeDescription = Left "Keep the description under 500 characters."
   | otherwise = Right (Mixtape strippedTitle (stripNonEmpty tapeDescription) tapeTracks)
   where
     strippedTitle = T.strip tapeTitle

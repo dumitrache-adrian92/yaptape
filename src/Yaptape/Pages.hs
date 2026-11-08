@@ -14,10 +14,24 @@ import Data.Text (Text)
 import qualified Data.Text as T
 import Lucid
 import Lucid.Base (makeAttribute)
-import Yaptape.Domain (StoredMixtape (..), StoredTrack (..), shareCodeFor)
+import Yaptape.Domain
+  ( StoredMixtape (..)
+  , StoredTrack (..)
+  , maxMixtapeDescriptionLength
+  , maxMixtapeTitleLength
+  , maxTrackNoteLength
+  , maxTrackTitleLength
+  , shareCodeFor
+  )
 import Yaptape.Form (CreateMixtapeForm (..))
 import Servant.API (ToHttpApiData (toUrlPiece))
 import Yaptape.YouTube (unYouTubeVideoId)
+
+assetVersion :: Text
+assetVersion = "3"
+
+versionedAsset :: Text -> Text
+versionedAsset path = path <> "?v=" <> assetVersion
 
 renderLandingPage :: Html ()
 renderLandingPage = layout "Yaptape" $ main_ [class_ "landing"] $ do
@@ -41,9 +55,9 @@ renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" 
     maybe mempty (p_ [class_ "error", role_ "alert"] . toHtml) errorMessage
     form_ [action_ "/create", method_ "post", makeAttribute "hx-post" "/create", makeAttribute "hx-target" "#create-flow", makeAttribute "hx-select" "#create-flow", makeAttribute "hx-swap" "outerHTML"] $ do
       label_ [class_ "field-label", for_ "tape-title"] "Mixtape title"
-      input_ ([id_ "tape-title", name_ "title", type_ "text", placeholder_ "Songs for the long way home", required_ "", maxlength_ "120"] <> maybe [] (\form -> [value_ form.formTitle]) previousForm)
+      input_ ([id_ "tape-title", name_ "title", type_ "text", placeholder_ "Songs for the long way home", required_ "", maxlength_ (T.pack (show maxMixtapeTitleLength))] <> maybe [] (\form -> [value_ form.formTitle]) previousForm)
       label_ [class_ "field-label", for_ "tape-description"] "A few words about this tape (optional)"
-      textarea_ [id_ "tape-description", name_ "description", rows_ "2", placeholder_ "Set the scene…", maxlength_ "500"] (maybe mempty (toHtml . fromMaybe "" . formDescription) previousForm)
+      textarea_ [id_ "tape-description", name_ "description", rows_ "2", placeholder_ "Set the scene…", maxlength_ (T.pack (show maxMixtapeDescriptionLength))] (maybe mempty (toHtml . fromMaybe "" . formDescription) previousForm)
       div_ [class_ "tracks-heading"] $ do
         h2_ "Tracklist"
         button_ [type_ "button", id_ "add-track", class_ "quiet-button"] "+ Add a track"
@@ -52,7 +66,7 @@ renderCreatePage errorMessage previousForm = layout "Make a mixtape · Yaptape" 
       button_ [type_ "submit", class_ "button submit-button"] "Create mixtape"
       p_ [class_ "fine-print"] "You can rearrange tracks before sharing your tape."
   script_ [src_ "/assets/js/htmx.min.js", defer_ "", makeAttribute "integrity" "sha256-Iig+9oy3VFkU8KiKG97cclanA9HVgMHSVSF9ClDTExM=", makeAttribute "crossorigin" "anonymous"] (mempty :: Html ())
-  script_ [src_ "/assets/js/create.js", defer_ ""] (mempty :: Html ())
+  script_ [src_ (versionedAsset "/assets/js/create.js"), defer_ ""] (mempty :: Html ())
 
 formRows :: Maybe CreateMixtapeForm -> [Maybe (Text, Text, Text)]
 formRows Nothing = [Nothing]
@@ -65,8 +79,8 @@ trackRow savedValues = div_ [class_ "track-row"] $ do
   div_ [class_ "track-number"] "♪"
   div_ [class_ "track-fields"] $ do
     input_ ([name_ "videoUrls", type_ "url", placeholder_ "YouTube video link", required_ "", class_ "video-url"] <> maybe [] (\(url, _, _) -> [value_ url]) savedValues)
-    input_ ([name_ "titles", type_ "text", placeholder_ "Track title (e.g. Artist - Song, or filled from YouTube)", class_ "track-title", maxlength_ "300"] <> maybe [] (\(_, _, trackTitle) -> [value_ trackTitle]) savedValues)
-    textarea_ [name_ "notes", rows_ "2", placeholder_ "What should they notice while this plays?", required_ "", class_ "track-note"] (maybe mempty (toHtml . (\(_, trackNote, _) -> trackNote)) savedValues)
+    input_ ([name_ "titles", type_ "text", placeholder_ "Track title (e.g. Artist - Song, or filled from YouTube)", class_ "track-title", maxlength_ (T.pack (show maxTrackTitleLength))] <> maybe [] (\(_, _, trackTitle) -> [value_ trackTitle]) savedValues)
+    textarea_ [name_ "notes", rows_ "2", placeholder_ "What should they notice while this plays?", required_ "", class_ "track-note", maxlength_ (T.pack (show maxTrackNoteLength))] (maybe mempty (toHtml . (\(_, trackNote, _) -> trackNote)) savedValues)
     p_ [class_ "url-hint", makeAttribute "aria-live" "polite"] "YouTube links from youtube.com or youtu.be"
   div_ [class_ "row-actions"] $ do
     button_ [type_ "button", makeAttribute "data-move" "up", class_ "icon-button", title_ "Move track up"] "↑"
@@ -86,7 +100,7 @@ renderCreatedPage mixtape = layout "Your mixtape is ready · Yaptape" $ main_ [c
     p_ [id_ "copy-status", class_ "fine-print", makeAttribute "aria-live" "polite"] mempty
     a_ [href_ ("/m/" <> toUrlPiece (shareCodeFor mixtape.mixtapeId)), class_ "text-link"] "Preview your mixtape →"
     a_ [href_ "/create", class_ "text-link secondary-link"] "Make another"
-    script_ [src_ "/assets/js/copy-link.js", defer_ ""] (mempty :: Html ())
+    script_ [src_ (versionedAsset "/assets/js/copy-link.js"), defer_ ""] (mempty :: Html ())
 
 renderErrorPage :: Text -> Text -> Html ()
 renderErrorPage heading message = layout (heading <> " · Yaptape") $ main_ [class_ "page-shell"] $ do
@@ -149,7 +163,7 @@ renderMixtapePage mixtape = layoutWithMeta tapeMeta $ div_ [class_ "page-shell l
         h2_ "The tracklist"
         p_ [id_ "current-track-counter", class_ "track-count"] ""
       ol_ [id_ "track-queue", class_ "playback-queue"] (mapM_ (uncurry renderQueueTrack) (zip [0 :: Int ..] mixtape.tracks))
-  script_ [src_ "/assets/js/playback.js", defer_ ""] (mempty :: Html ())
+  script_ [src_ (versionedAsset "/assets/js/playback.js"), defer_ ""] (mempty :: Html ())
   where
     firstThumbnail = case mixtape.tracks of
       (t : _) -> Just ("https://i.ytimg.com/vi/" <> unYouTubeVideoId t.videoId <> "/hqdefault.jpg")
@@ -188,7 +202,7 @@ layoutWithMeta pageMeta content = doctypehtml_ $ html_ [lang_ "en"] $ do
     link_ [rel_ "preconnect", href_ "https://fonts.googleapis.com"]
     link_ [rel_ "preconnect", href_ "https://fonts.gstatic.com", crossorigin_ "anonymous"]
     link_ [rel_ "stylesheet", href_ "https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap"]
-    link_ [rel_ "stylesheet", href_ "/assets/css/app.css?v=3"]
+    link_ [rel_ "stylesheet", href_ (versionedAsset "/assets/css/app.css")]
   body_ content
 
 renderQueueTrack :: Int -> StoredTrack -> Html ()

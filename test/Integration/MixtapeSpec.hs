@@ -6,11 +6,14 @@
 module Integration.MixtapeSpec (spec) where
 
 import Network.HTTP.Client (defaultManagerSettings, newManager)
+import Network.HTTP.Types (status404)
 import Network.Wai (Application)
 import Network.Wai.Handler.Warp (testWithApplication)
 import Servant.Client
   ( BaseUrl (..)
+  , ClientError (FailureResponse)
   , ClientM
+  , ResponseF (responseStatusCode)
   , Scheme (Http)
   , client
   , mkClientEnv
@@ -26,6 +29,7 @@ import Yaptape.Domain
   , StoredMixtape (..)
   , StoredTrack (..)
   , Track (..)
+  , mkMixtapeId
   , videoId
   , unMixtapeId
   , unTrackId
@@ -39,13 +43,19 @@ getMixtape :: MixtapeId -> ClientM StoredMixtape
 getMixtape = client getMixtapeApi
 
 spec :: SpecWith Application
-spec = describe "POST /mixtape (Integration)" $ do
-  it "persists a mixtape and its tracks and returns generated identifiers" $ \app -> do
-    let youtubeVideo = either (error . show) id (mkYouTubeVideoId "dQw4w9WgXcQ")
+spec = describe "POST & GET /api/mixtapes (Integration)" $ do
+  it "persists a multi-track mixtape in order and returns generated identifiers" $ \app -> do
+    let vid1 = either (error . show) id (mkYouTubeVideoId "dQw4w9WgXcQ")
+        vid2 = either (error . show) id (mkYouTubeVideoId "_rVvjslF6M8")
+        vid3 = either (error . show) id (mkYouTubeVideoId "M7lc1UVf-VE")
         mixtape = Mixtape
           { title = "Integration tape"
           , description = Just "Created by the API integration test"
-          , tracks = [Track youtubeVideo (Just "Track title") (Just "Artist") "A note"]
+          , tracks =
+              [ Track vid1 (Just "First track") (Just "Artist 1") "Opening note"
+              , Track vid2 Nothing Nothing "Middle note"
+              , Track vid3 (Just "Final track") Nothing "Closing note"
+              ]
           }
     testWithApplication (pure app) $ \port -> do
       manager <- newManager defaultManagerSettings
@@ -59,12 +69,34 @@ spec = describe "POST /mixtape (Integration)" $ do
           created.description `shouldBe` Just "Created by the API integration test"
           unMixtapeId created.mixtapeId `shouldNotBe` ""
           case created.tracks of
-            [track] -> do
-              unTrackId (trackId track) `shouldNotBe` ""
-              track.videoId `shouldBe` youtubeVideo
-              track.title `shouldBe` Just "Track title"
-              track.artist `shouldBe` Just "Artist"
-              track.note `shouldBe` "A note"
-            _ -> expectationFailure "Expected one persisted track"
+            [t1, t2, t3] -> do
+              unTrackId (trackId t1) `shouldNotBe` ""
+              t1.videoId `shouldBe` vid1
+              t1.title `shouldBe` Just "First track"
+              t1.artist `shouldBe` Just "Artist 1"
+              t1.note `shouldBe` "Opening note"
+
+              unTrackId (trackId t2) `shouldNotBe` ""
+              t2.videoId `shouldBe` vid2
+              t2.title `shouldBe` Nothing
+              t2.artist `shouldBe` Nothing
+              t2.note `shouldBe` "Middle note"
+
+              unTrackId (trackId t3) `shouldNotBe` ""
+              t3.videoId `shouldBe` vid3
+              t3.title `shouldBe` Just "Final track"
+              t3.artist `shouldBe` Nothing
+              t3.note `shouldBe` "Closing note"
+            _ -> expectationFailure "Expected three persisted tracks in order"
           fetchedResult <- runClientM (getMixtape created.mixtapeId) env
           fetchedResult `shouldBe` Right created
+
+  it "returns 404 Not Found for an unknown mixtape UUID" $ \app -> do
+    let missingId = maybe (error "invalid UUID") id (mkMixtapeId "00000000-0000-4000-8000-000000000099")
+    testWithApplication (pure app) $ \port -> do
+      manager <- newManager defaultManagerSettings
+      let env = mkClientEnv manager (BaseUrl Http "localhost" port "")
+      fetchedResult <- runClientM (getMixtape missingId) env
+      case fetchedResult of
+        Left (FailureResponse _ resp) -> responseStatusCode resp `shouldBe` status404
+        other -> expectationFailure ("Expected 404 FailureResponse, got: " ++ show other)

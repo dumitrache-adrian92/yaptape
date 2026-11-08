@@ -6,7 +6,7 @@ module Integration.TestDb
   ) where
 
 import Control.Concurrent (threadDelay)
-import Control.Exception (bracket)
+import Control.Exception (bracket, onException)
 import Data.Char (isDigit)
 import Data.Word (Word16)
 import Network.Wai (Application)
@@ -45,19 +45,23 @@ startPostgresContainer = do
     ]
     ""
   let containerId = filter (/= '\n') rawId
-  portOut <- readProcess "docker" ["port", containerId, "5432/tcp"] ""
-  port <- parseMappedPort portOut
-  let dbCfg = DbConfig
-        { dbHost = "127.0.0.1"
-        , dbPort = port
-        , dbUser = "yaptape"
-        , dbPassword = "yaptape-test"
-        , dbName = "yaptape_test"
-        }
-  pure (containerId, dbCfg)
+  (do
+    portOut <- readProcess "docker" ["port", containerId, "5432/tcp"] ""
+    port <- parseMappedPort portOut
+    let dbCfg = DbConfig
+          { dbHost = "127.0.0.1"
+          , dbPort = port
+          , dbUser = "yaptape"
+          , dbPassword = "yaptape-test"
+          , dbName = "yaptape_test"
+          }
+    pure (containerId, dbCfg)) `onException` removeContainer containerId
 
 stopPostgresContainer :: (String, DbConfig) -> IO ()
-stopPostgresContainer (containerId, _) = do
+stopPostgresContainer (containerId, _) = removeContainer containerId
+
+removeContainer :: String -> IO ()
+removeContainer containerId = do
   _ <- readProcess "docker" ["rm", "-f", containerId] ""
   pure ()
 

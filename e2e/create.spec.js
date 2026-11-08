@@ -36,6 +36,16 @@ test('create form manages tracks and looks up valid YouTube titles', async ({ pa
   await expect(trackRows).toHaveCount(1);
   await expect(trackRows.first().locator('.track-title')).toHaveValue('Never Gonna Give You Up');
 
+  await trackRows.first().locator('[data-remove]').click();
+  await expect(trackRows).toHaveCount(1);
+  await expect(trackRows.first().locator('.track-title')).toHaveValue('');
+
+  await trackRows.first().locator('.track-title').fill('My Custom Title');
+  await trackRows.first().locator('.video-url').fill('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+  await trackRows.first().locator('.video-url').dispatchEvent('change');
+  await expect(trackRows.first().locator('.url-hint')).toContainText('YouTube title found');
+  await expect(trackRows.first().locator('.track-title')).toHaveValue('My Custom Title');
+
   await trackRows.first().locator('.track-note').fill('A song for the long way home');
   await page.locator('#tape-title').fill('Road trip songs');
   await page.getByRole('button', { name: 'Create mixtape' }).click();

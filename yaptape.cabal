@@ -45,6 +45,9 @@ library
       Yaptape.Domain
       Yaptape.Form
       Yaptape.Pages
+      Yaptape.Pages.Create
+      Yaptape.Pages.Layout
+      Yaptape.Pages.Player
       Yaptape.Server
       Yaptape.YouTube
   other-modules:
